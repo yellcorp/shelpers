@@ -1,0 +1,26 @@
+#!/bin/bash
+. "$(dirname -- "$0")"/support.bash
+
+
+if [[ $# -eq 0 ]]; then
+	__yc_die_usage 'SCRIPTNAME [INTERPRETER [ARGS...]]'
+fi
+
+SCRIPT_NAME="$1"
+shift
+
+INTERP_NAME="$1"
+shift
+
+if [[ -z $INTERP_NAME ]]; then
+	INTERP_NAME=sh
+fi
+
+INTERP_PATH="$(which -- "$INTERP_NAME")"
+if [[ -z $INTERP_PATH ]]; then
+	__yc_die 2 "No interpreter with name '$INTERP_NAME'"
+fi
+
+set -o noclobber
+echo \#\!$INTERP_PATH "$@" > "$SCRIPT_NAME" && \
+	chmod a+x "$SCRIPT_NAME"

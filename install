@@ -1,0 +1,102 @@
+# Usage: sh install
+#    or  python install
+
+# Will edit or create your ~/.bash_profile to add the parent directory of
+# this file to your PATH, and source load-profile-d.bash, which in turn
+# sources every *.bash file in profile.d/
+
+# Proposed edits are shown before prompting for confirmation.
+
+""":"
+exec python "$0" "$@" || exit 1
+":"""
+
+from __future__ import division, print_function
+
+import os
+import sys
+
+
+try:
+	read_input = raw_input
+except NameError:
+	read_input = input
+
+
+def bool_prompt(prompt):
+	use_prompt = str(prompt)
+	while True:
+		response = read_input(use_prompt)
+		if len(response) >= 1:
+			char = response[0].lower()
+			if char == "y":
+				return True
+			if char == "n":
+				return False
+		use_prompt = " * Please type y or n: "
+
+
+def shell_quote(text):
+	return "'%s'" % text.replace("'", "'\\''")
+
+
+def main():
+	me = os.path.realpath(sys.argv[0])
+	here = os.path.dirname(me)
+
+	if ":" in here:
+		print("""\
+Scripts cannot be run from here because the path name contains a colon (':').
+This prevents it from being added to $PATH.""")
+		return 2
+
+	home = os.environ.get("HOME")
+	if home is not None and here.startswith(home):
+		payload_sq = "\"$HOME\"%s" % shell_quote(here[len(home):])
+	else:
+		payload_sq = shell_quote(here)
+	
+	self_id = "%s/%s" % (payload_sq, os.path.basename(me))
+
+	lines = [
+		'PATH="$PATH":%s' % payload_sq,
+		'export PATH',
+		'for file in %s/profile.d/*.bash; do' % payload_sq,
+		'\t[ -r "$file" ] && . "$file"',
+		'done',
+	]
+
+	profile_path = os.path.expanduser("~/.bash_profile")
+
+	if not os.path.exists(profile_path):
+		print("The file %r will be created." % profile_path)
+
+	print("The following lines will be added to %r:" % profile_path)
+	print()
+	for line in lines:
+		print(line)
+	
+	print()
+	try:
+		proceed = bool_prompt("Continue? (y/n) ")
+	except EOFError:
+		proceed = False
+
+	if not proceed:
+		print("Canceled")
+		return 1
+
+	lines[0:0] = [
+		"",
+		"# Following %d lines added by %s" % (len(lines), self_id)
+	]
+
+	with open(profile_path, "a") as profile_stream:
+		for line in lines:
+			print(line, file = profile_stream)
+	
+	print("Installed")
+	return 0
+
+
+sys.exit(main())

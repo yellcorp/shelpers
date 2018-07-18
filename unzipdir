@@ -1,0 +1,18 @@
+#!/bin/bash
+. "$(dirname -- "$0")"/support.bash
+
+
+for ZIPFILE in "$@"; do
+	DESTDIR="${ZIPFILE%.zip}"
+	if [[ $ZIPFILE == $DESTDIR ]]; then
+		DESTDIR="${DESTDIR}.d"
+	fi
+
+	if [[ -d "$DESTDIR" ]]; then
+		__yc_err $0: $ZIPFILE: skipping because directory '$DESTDIR' exists
+	else
+		mkdir -p "$DESTDIR" && \
+			unzip "$ZIPFILE" -d "$DESTDIR" 1>&2 && \
+			echo "$ZIPFILE"
+	fi
+done
