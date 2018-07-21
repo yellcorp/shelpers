@@ -1,34 +1,109 @@
-#!/bin/bash
-. "$(dirname -- "$0")"/support.bash
+#!/usr/bin/env python
 
 
-if [[ $# -eq 0 ]]; then
-	__yc_die_usage 'PATH [PATH...]'
-fi
+from __future__ import division, print_function
 
-TEMP_DIR=$(mktemp -d yc_jpegopt.XXXXXX)
-if [[ -z $TEMP_DIR ]];
-	__yc_die 'Failed to make temp dir'
-fi
+from shelper import print_error
 
-TEMP_FILE="$TEMP_DIR/temp.jpg"
+import argparse
+import os
+import subprocess
+import sys
+import tempfile
 
-cleanup()
-{
-	rm -f -- "$TEMP_FILE"
-	rmdir -- "$TEMP_DIR"
-	exit 255
-}
 
-trap cleanup EXIT
+EXIT_CODE_UNEXPECTED = 65
 
-RESULT=0
-for image in "$@"; do
-	jpegtran -copy none -optimize -- "$image" > "$TEMP_FILE" && \
-		cat "$TEMP_FILE" > "$image" || {
-			RESULT=$(( $? > $RESULT ? $? : $RESULT ))
-			__yc_err $0: $image: failed
-		}
-done
 
-exit $RESULT
+def get_arg_parser():
+    p = argparse.ArgumentParser(
+        description = """\
+            Use jpegtran to optimize JPEG image files
+            in-place."""
+    )
+
+    p.add_argument(
+        "paths",
+        nargs = "+",
+        help = "The jpeg files to optimize",
+        metavar = "PATH"
+    )
+
+    return p
+
+
+CHUNK_SIZE = 0x10000
+def copy_file(src_file, dest_path):
+    with open(dest_path, "wb") as dest_file:
+        while True:
+            chunk = src_file.read(CHUNK_SIZE)
+            if len(chunk) == 0:
+                break
+            dest_file.write(chunk)
+
+
+def jpegopt_with_tempfile(path, temp_file):
+    try:
+        input_size = os.path.getsize(path)
+    except EnvironmentError as env_err:
+        print_error("Could not get file size.", env_err, path)
+        input_size = None
+
+    if path[0] == "-":
+        use_path = "./%s" % path
+    else:
+        use_path = path
+
+    exit_code = subprocess.call(
+        ("jpegtran", "-copy", "none", "-optimize", use_path),
+        stdout = temp_file
+    )
+
+    if exit_code != 0:
+        print_error("jpegtran failed.", subject_file = path)
+
+    replace = True
+    if input_size is not None:
+        output_size = temp_file.tell()
+        if output_size >= input_size:
+            replace = False
+            print_error("File increased in size. Not replacing.", subject_file = path)
+
+    if replace:
+        try:
+            temp_file.seek(0)
+            copy_file(temp_file, path)
+        except EnvironmentError as env_err:
+            print_error("Could not replace file.", env_err, path)
+            exit_code = 1
+
+    return exit_code
+
+
+def jpegopt(path):
+    temp_fd, temp_path = tempfile.mkstemp(suffix = ".jpg")
+    temp_file = os.fdopen(temp_fd, "w+b")
+    temp_fd = None
+
+    try:
+        return jpegopt_with_tempfile(path, temp_file)
+    finally:
+        temp_file.close()
+        try:
+            os.remove(temp_path)
+        except EnvironmentError as env_err:
+            print_error("Could not delete temp file.", env_err, temp_path)
+
+
+def main():
+    config = get_arg_parser().parse_args()
+    try:
+        max_code = max(jpegopt(path) for path in config.paths)
+    except StandardError as error:
+        print_error("Unexpected error.", error)
+        return EXIT_CODE_UNEXPECTED
+    return max_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
