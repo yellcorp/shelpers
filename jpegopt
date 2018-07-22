@@ -59,15 +59,20 @@ def jpegopt_with_tempfile(path, temp_file):
         stdout = temp_file
     )
 
+    replace = True
     if exit_code != 0:
         print_error("jpegtran failed.", subject_file = path)
+        replace = False
 
-    replace = True
-    if input_size is not None:
+    elif input_size is not None:
         output_size = temp_file.tell()
-        if output_size >= input_size:
+        if output_size == 0:
+            print_error("New file size is 0. Not replacing.", subject_file = path)
+            exit_code = EXIT_CODE_UNEXPECTED
             replace = False
+        elif output_size >= input_size:
             print_error("File increased in size. Not replacing.", subject_file = path)
+            replace = False
 
     if replace:
         try:
