@@ -1,8 +1,3 @@
-myip()
-{
-	curl "$@" http://ipinfo.io/ip
-}
-
 cdof()
 {
 	if [[ $# -ne 1 ]]; then
