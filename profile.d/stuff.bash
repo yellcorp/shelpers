@@ -6,5 +6,3 @@ cdof()
 	fi
 	cd -- "$(dirname -- "$1")"
 }
-
-alias reveal='open -R'
