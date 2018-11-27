@@ -5,4 +5,4 @@ works on 2 of my machines.
 
 Copy and paste this at a shell with reckless abandon to install it:
 
-git clone git@github.com:yellcorp/shelpers.git ~/Scripts && sh ~/Scripts/install
+git clone git@github.com:yellcorp/shelpers.git ~/Scripts && python ~/Scripts/install

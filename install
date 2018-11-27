@@ -1,5 +1,4 @@
-# Usage: sh install
-#    or  python install
+# Usage: python install
 
 # Will edit or create your ~/.bash_profile to add the parent directory of
 # this file to your PATH, and source load-profile-d.bash, which in turn
@@ -7,9 +6,6 @@
 
 # Proposed edits are shown before prompting for confirmation.
 
-""":"
-exec python "$0" "$@" || exit 1
-":"""
 
 from __future__ import division, print_function
 
