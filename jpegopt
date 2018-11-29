@@ -7,6 +7,7 @@ from shelper import print_error
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -30,16 +31,6 @@ def get_arg_parser():
     )
 
     return p
-
-
-CHUNK_SIZE = 0x10000
-def copy_file(src_file, dest_path):
-    with open(dest_path, "wb") as dest_file:
-        while True:
-            chunk = src_file.read(CHUNK_SIZE)
-            if len(chunk) == 0:
-                break
-            dest_file.write(chunk)
 
 
 def jpegopt_with_tempfile(path, temp_file):
@@ -77,7 +68,8 @@ def jpegopt_with_tempfile(path, temp_file):
     if replace:
         try:
             temp_file.seek(0)
-            copy_file(temp_file, path)
+            with open(path, "wb") as writer:
+                shutil.copyfileobj(temp_file, writer)
         except EnvironmentError as env_err:
             print_error("Could not replace file.", env_err, path)
             exit_code = 1
