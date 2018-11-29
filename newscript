@@ -1,26 +1,88 @@
-#!/bin/bash
-. "$(dirname -- "$0")"/support.bash
+#!/usr/bin/env python
 
 
-if [[ $# -eq 0 ]]; then
-	__yc_die_usage 'SCRIPTNAME [INTERPRETER [ARGS...]]'
-fi
+from __future__ import division, print_function
 
-SCRIPT_NAME="$1"
-shift
 
-INTERP_NAME="$1"
-shift
+import argparse
+import os
+import stat
+import subprocess
 
-if [[ -z $INTERP_NAME ]]; then
-	INTERP_NAME=sh
-fi
 
-INTERP_PATH="$(which -- "$INTERP_NAME")"
-if [[ -z $INTERP_PATH ]]; then
-	__yc_die 2 "No interpreter with name '$INTERP_NAME'"
-fi
+def get_arg_parser():
+	p = argparse.ArgumentParser(
+		description = """\
+			Create a new script with the given interpreter name and execute
+			bits set.
+		"""
+	)
 
-set -o noclobber
-echo \#\!$INTERP_PATH "$@" > "$SCRIPT_NAME" && \
-	chmod a+x "$SCRIPT_NAME"
+	p.add_argument(
+		"script_path",
+		help = """\
+			The path to the script file to be created. By default, will not
+			overwrite the file if present.
+		"""
+	)
+
+	p.add_argument(
+		"interpreter",
+		nargs = "?",
+		default = "sh",
+		help = """\
+			The interpreter to place in the shebang line. If this is not an
+			absolute path, the system path will be searched and the absolute
+			path of the result used.
+		"""
+	)
+
+	p.add_argument(
+		"interpreter_args",
+		nargs = "*",
+		help = """\
+			Arguments to pass to the interpreter on the shebang line.
+		"""
+	)
+
+	p.add_argument(
+		"--force", "-f",
+		action = "store_true",
+		help = """\
+			Overwrite the output path if it exists.
+		"""
+	)
+
+	return p
+
+
+ALL_EXECUTE = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+
+
+def resolve_exec(executable):
+	if os.path.isabs(executable):
+		return executable
+
+	return subprocess.check_output(("which", executable)).rstrip()
+
+
+def main():
+	args = get_arg_parser().parse_args()
+	interpreter = resolve_exec(args.interpreter)
+
+	shebang = [ "#!%s" % interpreter ] + args.interpreter_args
+
+	open_flags = os.O_WRONLY | os.O_CREAT
+	if not args.force:
+		open_flags |= os.O_EXCL
+
+	fd = os.open(args.script_path, open_flags)
+	with os.fdopen(fd, "w") as writer:
+		print(" ".join(shebang), file = writer)
+
+	script_stat = os.stat(args.script_path)
+	os.chmod(args.script_path, stat.S_IMODE(script_stat.st_mode) | ALL_EXECUTE)
+
+
+if __name__ == "__main__":
+	main()
