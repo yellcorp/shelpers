@@ -9,7 +9,7 @@ for ZIPFILE in "$@"; do
 	fi
 
 	if [[ -d "$DESTDIR" ]]; then
-		__yc_err $0: $ZIPFILE: skipping because directory '$DESTDIR' exists
+		echo $0: $ZIPFILE: skipping because directory '$DESTDIR' exists 1>&2
 	else
 		mkdir -p "$DESTDIR" && \
 			unzip "$ZIPFILE" -d "$DESTDIR" 1>&2 && \

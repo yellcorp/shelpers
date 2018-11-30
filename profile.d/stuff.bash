@@ -1,7 +1,8 @@
 cdof()
 {
 	if [[ $# -ne 1 ]]; then
-		__yc_err usage: cdof FILEPATH
+		echo "usage: cdof FILEPATH" 1>&2
+		echo "Changes to the enclosing directory of FILEPATH" 1>&2
 		return 1
 	fi
 	cd -- "$(dirname -- "$1")"
