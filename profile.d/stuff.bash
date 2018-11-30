@@ -5,5 +5,7 @@ cdof()
 		echo "Changes to the enclosing directory of FILEPATH" 1>&2
 		return 1
 	fi
-	cd -- "$(dirname -- "$1")"
+	local container="$(dirname -- "$1")"
+	echo $container
+	cd -- $container
 }
