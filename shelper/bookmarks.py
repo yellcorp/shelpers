@@ -1,72 +1,98 @@
 from __future__ import division, print_function
 
+from collections import OrderedDict
 import urllib # 2
 
 
 class _URL(object):
-    def __init__(self, url, **get_params):
+    def __init__(self, url, **qs_params):
         self.url = url
-        self.get = dict(get_params)
+        self.qs = OrderedDict(qs_params)
 
     def update(self, *args, **kwargs):
-        self.get.update(*args, **kwargs)
+        self.qs.update(*args, **kwargs)
         return self
 
-    def to_url(self):
-        if self.get and len(self.get) > 0:
-            return "%s?%s" % (self.url, urllib.urlencode(self.get))
-        return "%s" % self.url
+    def __str__(self):
+        if self.qs and len(self.qs) > 0:
+            return "{!s}?{!s}".format(self.url, urllib.urlencode(self.qs))
+        return str(self.url)
 
 
-def google(arg):
+def _space(inner_func):
+    def wrapped(arg_array):
+        return inner_func(" ".join(str(e) for e in arg_array))
+    return wrapped
+
+
+@_space
+def search_google(arg):
     return _URL("https://www.google.com/search", q = arg)
 
-def google_image(arg):
-    return google(arg).update(tbm = "isch")
+@_space
+def search_google_image(arg):
+    return search_google(arg).update(tbm = "isch")
 
-def google_video(arg):
-    return google(arg).update(tbm = "vid")
-
-
-def duckduckgo(arg):
-    return _URL("https://duckduckgo.com/", q = arg)
-
-def duckduckgo_image(arg):
-    return duckduckgo(arg).update(ia = "images", iax = "images")
-
-def duckduckgo_video(arg):
-    return duckduckgo(arg).update(ia = "videos", iax = "videos")
+@_space
+def search_google_video(arg):
+    return search_google(arg).update(tbm = "vid")
 
 
-def youtube(arg):
+@_space
+def search_ddg(arg):
+    return _URL("https://duckduckgo.com/search", q = arg)
+
+@_space
+def search_ddg_image(arg):
+    return search_ddg(arg).update(ia = "images", iax = "images")
+
+@_space
+def search_ddg_video(arg):
+    return search_ddg(arg).update(ia = "videos", iax = "videos")
+
+
+@_space
+def search_youtube(arg):
     return _URL("https://www.youtube.com/results", search_query = arg)
 
 
-def symbolhound(arg):
+@_space
+def search_symbolhound(arg):
     return _URL("http://symbolhound.com/", q = arg)
 
 
-def mdn(arg):
+@_space
+def search_mdn(arg):
     return _URL("https://developer.mozilla.org/en-US/search", q = arg)
 
 
-def _pydocs(version, arg):
+def _pydocs(version, query):
     return _URL(
         "https://docs.python.org/%s/search.html" % version,
-        q = arg,
+        q = query,
         check_keywords = "yes",
         area = "default"
     )
 
-def pydocs2(arg):
+@_space
+def search_pydocs2(arg):
     return _pydocs("2", arg)
 
-def pydocs3(arg):
+@_space
+def search_pydocs3(arg):
     return _pydocs("3", arg)
 
 
-def github(arg):
+@_space
+def search_github(arg):
     return _URL("https://github.com/search", q = arg)
 
-def bitbucket(arg):
+
+@_space
+def search_bitbucket(arg):
     return _URL("https://bitbucket.org/repo/all/", name = arg)
+
+
+@_space
+def search_wolfram_alpha(arg):
+    return _URL("https://www.wolframalpha.com/input/", i = arg)
