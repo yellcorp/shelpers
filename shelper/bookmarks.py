@@ -1,13 +1,15 @@
 from __future__ import division, print_function
 
-from collections import OrderedDict
-import urllib # 2
+# we have a hacky introspection thing going on where it's assumed all names not
+# beginning with _ are URL generation functions
+from collections import OrderedDict as _OrderedDict
+from urllib import urlencode as _urlencode
 
 
 class _URL(object):
     def __init__(self, url, **qs_params):
         self.url = url
-        self.qs = OrderedDict(qs_params)
+        self.qs = _OrderedDict(qs_params)
 
     def update(self, *args, **kwargs):
         self.qs.update(*args, **kwargs)
@@ -15,7 +17,7 @@ class _URL(object):
 
     def __str__(self):
         if self.qs and len(self.qs) > 0:
-            return "{!s}?{!s}".format(self.url, urllib.urlencode(self.qs))
+            return "{!s}?{!s}".format(self.url, _urlencode(self.qs))
         return str(self.url)
 
 
