@@ -1,0 +1,351 @@
+#!/usr/bin/env python3
+
+
+from PIL import Image
+
+from argparse import ArgumentParser
+from base64 import standard_b64encode
+import io
+import os
+import re
+import sys
+
+
+# tmux sequence wrapper from iTerm's own imgcat
+# still doesn't really work as tmux can't track how far the cursor advances
+# after displaying the image
+if os.environ.get("TERM", "").startswith("screen"):
+    OSC_TEMPLATE = "\x1bPtmux;\x1b\x1b]{}\x07\x1b\\"
+else:
+    OSC_TEMPLATE = "\x1b]{}\x07"
+
+def osc(content):
+    return OSC_TEMPLATE.format(content)
+
+
+# it's just displaying in the terminal; be fast not fancy
+RESAMPLE_FILTER = Image.BILINEAR
+
+IMAGE_TRANSFER_FORMAT_KWARGS = dict(
+    format = "jpeg",
+    quality = 70,
+    subsampling = "4:2:0",
+)
+
+
+EXEC_NAME = os.path.basename(sys.argv[0])
+def report_error(message, path = None, exc = None):
+    parts = [ EXEC_NAME, ": " ]
+    if path is not None:
+        parts.extend((path, ": "))
+
+    parts.extend(message)
+    if exc is not None:
+        parts.extend((" (", str(exc), ")"))
+
+    print("".join(parts), file = sys.stderr)
+
+
+def image_scale_uniform(image, factor):
+    return image.resize(
+        [ max(1, int(axis * factor + 0.5)) for axis in image.size ],
+        RESAMPLE_FILTER
+    )
+
+
+def image_downscale_uniform(image, factor):
+    if factor >= 1:
+        return image
+    return image_scale_uniform(image, factor)
+
+
+def scaler_fit(width, height):
+    def scale(image):
+        owidth, oheight = image.size
+        factor = min(1, width / owidth, height / oheight)
+        return image_downscale_uniform(image, factor)
+    return scale
+
+
+def scaler_width(width):
+    def scale(image):
+        return image_downscale_uniform(image, width / image.size[0])
+    return scale
+
+
+def scaler_factor(factor):
+    def scale(image):
+        return image_scale_uniform(image, factor)
+    return scale
+
+
+def scaler_identity(image):
+    return image
+
+
+def parse_scale(scale_spec):
+    if scale_spec.endswith("%"):
+        factor = float(scale_spec[:-1]) / 100
+        if factor == 1:
+            return scaler_identity
+        return scaler_factor(factor)
+
+    if re.match(r"^\d+$", scale_spec):
+        return scaler_width(int(scale_spec))
+
+    width, height = re.split(r"[^\s\d]+", scale_spec, 1)
+    return scaler_fit(int(width), int(height))
+
+
+def get_arg_parser():
+    p = ArgumentParser(
+        description = """\
+            Displays images in iTerm format.
+        """
+    )
+
+    p.add_argument(
+        "paths",
+        nargs = "+",
+        help = "The files to display"
+    )
+
+    p.add_argument(
+        "--size", "-s",
+        type = parse_scale,
+        default = "640x480",
+        help = """\
+            The size at which to display the image. If specified as dimensions
+            #x#, the image will be proportionately scaled down to fit if
+            necessary.  If a single dimension is specified, the image's width
+            will be scaled to this. If a percentage #%, the image will be
+            scaled by that amount.  Specify 100% to display it without
+            transformation.  The default is %(default)s.
+        """
+    )
+
+    p.add_argument(
+        "--recurse", "-r",
+        action = "store_true",
+        help = """\
+            Recursively search directories for images and display them.
+        """
+    )
+
+    p.add_argument(
+        "--alpha", "-a",
+        action = "store_true",
+        help = """\
+            Preserve alpha. If not specified (the default), images with alpha
+            channels are composited against a checkerboard pattern.
+        """
+    )
+
+    return p
+
+
+def base64_text(data):
+    return standard_b64encode(data).decode("ascii")
+
+
+def iterm_format_dict(d):
+    return ";".join(
+        "{0!s}={1!s}".format(*pair)
+        for pair in d.items()
+    )
+
+
+def iterm_encode_image(image, name = None):
+    transfer_file = io.BytesIO()
+    image.save(transfer_file, **IMAGE_TRANSFER_FORMAT_KWARGS)
+
+    transfer_bytes = transfer_file.getvalue()
+
+    kwargs = dict(
+        width = "auto",
+        height = "auto",
+        preserveAspectRatio = 1,
+        inline = 1,
+        size = len(transfer_bytes),
+    )
+
+    if name is not None:
+        kwargs["name"] = base64_text(name.encode("utf-8"))
+
+    return osc(
+        "1337;File={kwargs}:{encoded_bytes}".format(
+            kwargs = iterm_format_dict(kwargs),
+            encoded_bytes = base64_text(transfer_bytes),
+        )
+    )
+
+
+SUPPORTED_EXTS = frozenset((
+    "bmp",
+    "eps",
+    "gif",
+    "icns",
+    "ico",
+    "jpg", "jpe", "jpeg", "jfif",
+    "jp2",
+    "pcx",
+    "png",
+    "pbm", "pgm", "ppm",
+    "sgi",
+    "spi", "spider",
+    "tga", "targa",
+    "tif", "tiff",
+    "webp",
+    "xbm",
+
+    "blp", "blp1", "blp2",
+    "cur",
+    "dcx",
+    "dds",
+    "fli", "flc",
+    "fpx",
+    "ftex",
+    "gbr",
+    "imt",
+    "mic",
+    "mpo",
+    "pcd",
+    "psd",
+    "xpm",
+))
+def is_image_filename(name):
+    name = name.lower()
+    if name == ".icns":
+        return True
+
+    _, ext = os.path.splitext(name)
+    return ext[1:].lower() in SUPPORTED_EXTS
+
+
+def recursive_file_iter(paths):
+    def walk_error(os_error):
+        report_error("Error recursing", path = os_error.filename, exc = os_error)
+
+    for path in paths:
+        try:
+            realpath = os.path.realpath(path)
+        except OSError as problem:
+            report_error("Error resolving path", path = path, exc = problem)
+
+        for container, dirnames, filenames in os.walk(realpath, onerror = walk_error):
+            dirnames[:] = [ d for d in dirnames if not d.startswith(".") ]
+            for f in filenames:
+                if is_image_filename(f):
+                    yield os.path.join(container, f)
+
+
+def generate_checkerboard(dimensions, checker_size, color1, color2, mode = "P"):
+    if any(axis <= 0 for axis in dimensions):
+        raise ValueError("Invalid dimensions")
+
+    if checker_size <= 0:
+        raise ValueError("Invalid checker_size")
+
+    if mode not in ("P", "RGB"):
+        raise ValueError("Mode must be one of 'P', 'RGB'")
+
+    # ceil-divide dimensions by checker_size to get the canvas size
+    # at which one checker = one pixel
+    small_dims = [
+        (axis + checker_size - 1) // checker_size
+        for axis in dimensions
+    ]
+
+    # make sure the width is an odd number, so that a run of alternating
+    # pixels, when wrapped to the width, will be offset every other row
+    small_dims[0] |= 1
+
+    # how many pixels?
+    checker_count = small_dims[0] * small_dims[1]
+
+    # how many pairs? ceil-divide by 2
+    pair_count = (checker_count + 1) >> 1
+
+    checker_raster = b"\x00\x01" * pair_count
+    pix_image = Image.frombytes("P", small_dims, checker_raster)
+
+    palette = bytearray(768)
+    palette[0:3] = color1
+    palette[3:6] = color2
+    pix_image.putpalette(palette)
+
+    large_dims = [ axis * checker_size for axis in small_dims ]
+    oversized_image = pix_image.resize(large_dims, Image.NEAREST)
+    del pix_image
+
+    # a small touch: center the crop that we take from the oversized
+    # checkerboard
+    offset = [
+        (large - final) // 2
+        for large, final in zip(large_dims, dimensions)
+    ]
+    box = offset + [ offset[0] + dimensions[0], offset[1] + dimensions[1] ]
+    final_image = oversized_image.crop(box)
+
+    if mode == "P":
+        final_image.load()
+        return final_image
+
+    return final_image.convert("RGB")
+
+
+def composite_checkerboard(rgba_image, checker_size, color1, color2):
+    checkerboard = generate_checkerboard(rgba_image.size, checker_size, color1, color2, "RGB")
+    checkerboard.paste(rgba_image, None, rgba_image)
+    return checkerboard
+
+
+def image_has_transparency(image):
+    return image.mode in ("RGBA", "RGBa", "LA") or "transparency" in image.info
+
+
+def deref_palette(image):
+    if image.mode in ("L", "RGB", "RGBA"):
+        return image
+
+    if image.mode == "1":
+        return image.convert("L")
+
+    if image_has_transparency(image):
+        return image.convert("RGBA")
+
+    return image.convert("RGB")
+
+
+def show_image(path, resize_func, allow_alpha):
+    try:
+        image = Image.open(path)
+    except Exception as problem:
+        report_error("Error while reading", path = path, exc = problem)
+        return
+
+    image = resize_func(deref_palette(image))
+
+    if image_has_transparency(image) and not allow_alpha:
+        image = composite_checkerboard(image, 16, (111, 111, 111), (143, 143, 143))
+
+    print(path)
+    print(iterm_encode_image(image, name = path))
+
+
+def main():
+    exec_name = os.path.basename(sys.argv[0])
+    config = get_arg_parser().parse_args()
+    resize_func = config.size
+
+    if config.recurse:
+        files = recursive_file_iter(config.paths)
+    else:
+        files = config.paths
+
+    for path in files:
+        show_image(path, resize_func, config.alpha)
+
+
+if __name__ == "__main__":
+    main()
