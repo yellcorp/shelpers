@@ -1,5 +1,4 @@
 #!/bin/bash
-. "$(dirname -- "$0")"/support.bash
 
 
 TIMESTAMP_FORMAT='%Y%m%d%H%M%S'

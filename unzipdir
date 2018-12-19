@@ -1,5 +1,4 @@
 #!/bin/bash
-. "$(dirname -- "$0")"/support.bash
 
 
 for ZIPFILE in "$@"; do
