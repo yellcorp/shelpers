@@ -1,7 +1,11 @@
-from __future__ import division, print_function
-
 # we have a hacky introspection thing going on where it's assumed all names not
 # beginning with _ are URL generation functions
+
+# turns out imports from __future__ are visible name table entries too; i
+# didn't know that
+
+from __future__ import division as _division, print_function as _print_function
+
 from collections import OrderedDict as _OrderedDict
 from urllib import urlencode as _urlencode
 

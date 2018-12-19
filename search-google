@@ -16,15 +16,57 @@ def exec_to_func_name(path):
 	return stem.replace("-", "_")
 
 
+def relink(script_path):
+	script_path = os.path.realpath(script_path)
+	script_dir, script_name = os.path.split(script_path)
+
+	for name in dir(shelper.bookmarks):
+		if name.startswith("_"):
+			continue
+
+		link_name = name.replace("_", "-")
+		link_path = os.path.join(script_dir, link_name)
+		
+		if os.path.islink(link_path):
+			try:
+				os.unlink(link_path)
+			except OSError:
+				print("Failed to remove {}".format(link_path))
+
+		try:
+			if os.path.samefile(link_path, script_path):
+				print("Not linking {} to {}: same file".format(link_path, script_path))
+				continue
+		except OSError:
+			pass
+
+		print("Linking {} to {}".format(link_path, script_name))
+		try:
+			os.symlink(script_name, link_path)
+		except OSError as os_error:
+			print("Failed: {}: {}".format(link_path, os_error))
+
+
 def main():
-	func_name = exec_to_func_name(sys.argv[0])
+	invocation = sys.argv[0]
+
+	if len(sys.argv) == 2 and sys.argv[1] == "--relink":
+		relink(__file__)
+		return
+
+	if sys.argv[1] == "--":
+		args = sys.argv[2:]
+	else:
+		args = sys.argv[1:]
+
+	func_name = exec_to_func_name(invocation)
 
 	# always deny use of a name with a leading underscore
 	if func_name == "" or func_name[0] == "_":
 		raise KeyError(func_name)
 
 	bookmark_func = getattr(shelper.bookmarks, func_name)
-	url = bookmark_func(sys.argv[1:])
+	url = bookmark_func(args)
 	subprocess.check_call(("open", str(url)))
 
 
