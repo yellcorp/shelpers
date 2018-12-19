@@ -232,11 +232,14 @@ def recursive_file_iter(paths):
         except OSError as problem:
             report_error("Error resolving path", path = path, exc = problem)
 
-        for container, dirnames, filenames in os.walk(realpath, onerror = walk_error):
-            dirnames[:] = [ d for d in dirnames if not d.startswith(".") ]
-            for f in filenames:
-                if is_image_filename(f):
-                    yield os.path.join(container, f)
+        if os.path.isdir(realpath) or os.path.ismount(realpath):
+            for container, dirnames, filenames in os.walk(realpath, onerror = walk_error):
+                dirnames[:] = [ d for d in dirnames if not d.startswith(".") ]
+                for f in filenames:
+                    if is_image_filename(f):
+                        yield os.path.join(container, f)
+        else:
+            yield path
 
 
 def generate_checkerboard(dimensions, checker_size, color1, color2, mode = "P"):
