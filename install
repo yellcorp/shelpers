@@ -1,8 +1,7 @@
 # Usage: python install
 
-# Will edit or create your ~/.bash_profile to add the parent directory of
-# this file to your PATH, and source load-profile-d.bash, which in turn
-# sources every *.bash file in profile.d/
+# Will edit or create your ~/.bash_profile to add the parent directory of this
+# file to your PATH, and source every *.bash file in ./profile.d/
 
 # Proposed edits are shown before prompting for confirmation.
 
