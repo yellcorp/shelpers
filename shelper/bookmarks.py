@@ -46,7 +46,7 @@ def search_google_video(arg):
 
 @_space
 def search_ddg(arg):
-    return _URL("https://duckduckgo.com/search", q = arg)
+    return _URL("https://duckduckgo.com/", q = arg, t = "h_", ia = "web")
 
 @_space
 def search_ddg_image(arg):
