@@ -12,3 +12,7 @@ cdof()
 	echo $container
 	cd -- "$container"
 }
+
+# Run screensaver immediately. Effectively a screen lock if a password is
+# required to exit the screensaver.
+alias screensaver='open -a ScreenSaverEngine'
