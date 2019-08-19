@@ -10,5 +10,5 @@ cdof()
 	# `cd ..`, but this will trash `cd -` to return to the previous directory
 	local container="$(dirname -- "$1")"
 	echo $container
-	cd -- $container
+	cd -- "$container"
 }
