@@ -1,2 +1,2 @@
 #!/bin/bash
-exec open -b com.suavetech.0xED "$@"
+exec open -b com.ridiculousfish.HexFiend "$@"
