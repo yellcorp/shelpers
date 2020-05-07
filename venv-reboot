@@ -1,0 +1,135 @@
+#!/bin/bash
+
+# Tears down and recreates a Python virtualenv.
+#
+# Usage: venv-reboot PATH
+#
+# Where PATH is a directory containing a virtualenv - i.e. a directory which
+# contains `bin`, `include`, `lib` directories etc.
+#
+# Use this to fix virtualenvs which have been moved within the filesystem or
+# between computers, or to upgrade the Python minor version.
+#
+# The script tries to determine which Python version is installed in the
+# virtualenv, first searching for a Python interpreter with the same minor
+# version in the path, then searching for one with the same major version if
+# that is unsuccessful. It also tries to record the current dependencies by
+# saving the output of `pip freeze` to a temporary file. It then deletes and
+# recreates the virtualenv with the discovered Python interpreter and
+# reinstalls the snapshotted pip dependencies.
+
+warn () {
+   echo "$*" 1>&2
+}
+
+die () {
+   warn "$*"
+   exit 1
+}
+
+maybe_which () {
+   if [ ! -z "${2+_}" ]; then
+      die "Can't decide between: $@"
+   elif [ ! -z "$1" ]; then
+      which "$1" || warn "Couldn't find $1 in the system path."
+   fi
+}
+
+VENV_MARKER=.Python
+
+[ -z "$VIRTUAL_ENV" ] || die 'Deactivate your current virtualenv first!'
+[ ! -z "$1" ] || die 'Specify a path to a virtualenv.'
+cd -- "$1" || die "Couldn't chdir to $1"
+
+VIRTUAL_ENV="$(pwd)"
+export VIRTUAL_ENV
+echo VIRTUAL_ENV=$VIRTUAL_ENV
+
+[ -L "$VENV_MARKER" ] || die "Couldn't find $VENV_MARKER in $VIRTUAL_ENV. Is it a virtualenv?"
+pushd bin || die "Couldn't chdir to $VIRTUAL_ENV/bin. Is it a virtualenv?"
+
+
+# ---- from original activate script ----
+
+_OLD_VIRTUAL_PATH="$PATH"
+PATH="$VIRTUAL_ENV/bin:$PATH"
+export PATH
+
+# unset PYTHONHOME if set
+if ! [ -z "${PYTHONHOME+_}" ] ; then
+    _OLD_VIRTUAL_PYTHONHOME="$PYTHONHOME"
+    unset PYTHONHOME
+fi
+
+# ---- END from original activate script ----
+
+
+# snapshot current dependencies
+
+TEMP_REQS=""
+pip -V && TEMP_REQS="$(mktemp -t venvreboot)"
+[ ! -z "$TEMP_REQS" ] && pip freeze > "$TEMP_REQS" || \
+   warn 'Failed to preserve dependencies. Stopping.'
+
+echo TEMP_REQS=$TEMP_REQS
+
+
+# deactivate
+
+PATH="$_OLD_VIRTUAL_PATH"
+export PATH
+unset _OLD_VIRTUAL_PATH
+
+if ! [ -z "${_OLD_VIRTUAL_PYTHONHOME+_}" ] ; then
+   PYTHONHOME="$_OLD_VIRTUAL_PYTHONHOME"
+   export PYTHONHOME
+   unset _OLD_VIRTUAL_PYTHONHOME
+fi
+
+
+# try and figure out what version of python has been symlinked in here
+
+PYTHON_PATH=""
+#if $TODO_MATCH_MINOR_VERSION; then
+PYTHON_PATH="$(maybe_which python[23].*)"
+if [ -z "$PYTHON_PATH" ]; then
+   warn "Couldn't determine minor version of this virtualenv. Will try to match major version."
+fi
+#fi
+
+if [ -z "$PYTHON_PATH" ]; then
+   PYTHON_PATH="$(maybe_which python[23])"
+fi
+
+if [ -z "$PYTHON_PATH" ]; then
+   die "Couldn't determine major version of this virtualenv. Stopping."
+else
+   echo "Recreating virtualenv with $PYTHON_PATH"
+fi
+
+
+# destroy venv
+
+popd
+for dir in bin include lib share; do
+   [ -d "$dir" ] && [ ! -L "$dir" ] && rm -r "$dir"
+done
+rm .Python
+cd ..
+rmdir "$VIRTUAL_ENV" || warn "Couldn't delete virtualenv."
+
+
+# create new venv
+
+virtualenv -p "$PYTHON_PATH" "$VIRTUAL_ENV" || die "Recreation of virtualenv failed."
+
+if [ ! -z "$TEMP_REQS" ]; then
+   cd "$VIRTUAL_ENV" && \
+      . bin/activate && \
+      pip install -r "$TEMP_REQS" || (
+         RECOVER_REQS=$(mktemp requirements.txt.XXXXXXXX)
+         cp "$TEMP_REQS" "$RECOVER_REQS"
+         warn "Failed to reinstall dependencies. Dependency list has been left in $RECOVER_REQS"
+      )
+   rm "$TEMP_REQS"
+fi
