@@ -1,135 +1,237 @@
 #!/bin/bash
 
-# Tears down and recreates a Python virtualenv.
-#
-# Usage: venv-reboot PATH
-#
-# Where PATH is a directory containing a virtualenv - i.e. a directory which
-# contains `bin`, `include`, `lib` directories etc.
-#
-# Use this to fix virtualenvs which have been moved within the filesystem or
-# between computers, or to upgrade the Python minor version.
-#
-# The script tries to determine which Python version is installed in the
-# virtualenv, first searching for a Python interpreter with the same minor
-# version in the path, then searching for one with the same major version if
-# that is unsuccessful. It also tries to record the current dependencies by
-# saving the output of `pip freeze` to a temporary file. It then deletes and
-# recreates the virtualenv with the discovered Python interpreter and
-# reinstalls the snapshotted pip dependencies.
-
 warn () {
    echo "$*" 1>&2
 }
+
 
 die () {
    warn "$*"
    exit 1
 }
 
-maybe_which () {
-   if [ ! -z "${2+_}" ]; then
-      die "Can't decide between: $@"
-   elif [ ! -z "$1" ]; then
-      which "$1" || warn "Couldn't find $1 in the system path."
+
+usage () {
+   echo "usage: $(basename "$0") [-hfjt] DIR"
+   echo ''
+   echo '  Deletes and recreates a Python virtualenv. Normally this script'
+   echo '  attempts to perform the following steps:'
+   echo ''
+   echo '  * Determine the version of the Python interpreter linked in the virtualenv.'
+   echo '    * This is done by either running the interpreter to report its own'
+   echo '      version, or, if it is broken for any reason, by examining the filename'
+   echo '      of the linked interpreter.'
+   echo '  * Finds an installed Python interpreter that matches.'
+   echo '  * Preserves pip dependencies in a temporary file.'
+   echo '  * Deletes the virtualenv.'
+   echo '  * Recreates it with the matching Python interpreter.'
+   echo '  * Reinstalls the preserved pip dependencies.'
+   echo ''
+   echo '  -h   Show this help and exit.'
+   echo '  -j   Match major version of the Python interpreter only; don'\''t attempt'
+   echo '         to match minor version.'
+   echo '  -s   Skip preservation and reinstallation of pip dependencies.'
+   echo '  -t   Test; Display what Python interpreter would be used and stop.'
+   echo '  DIR  The directory containing the virtualenv to recreate.'
+
+   if [ "$HELP" == "1" ]; then
+      exit 0
+   fi
+   exit 2
+}
+
+
+activate () {
+   # ---- from original activate script ----
+   _OLD_VIRTUAL_PATH="$PATH"
+   PATH="$VIRTUAL_ENV/bin:$PATH"
+   export PATH
+
+   # unset PYTHONHOME if set
+   if ! [ -z "${PYTHONHOME+_}" ] ; then
+       _OLD_VIRTUAL_PYTHONHOME="$PYTHONHOME"
+       unset PYTHONHOME
    fi
 }
 
-VENV_MARKER=.Python
+
+deactivate () {
+   # ---- from original activate script ----
+   PATH="$_OLD_VIRTUAL_PATH"
+   export PATH
+   unset _OLD_VIRTUAL_PATH
+
+   if ! [ -z "${_OLD_VIRTUAL_PYTHONHOME+_}" ] ; then
+      PYTHONHOME="$_OLD_VIRTUAL_PYTHONHOME"
+      export PYTHONHOME
+      unset _OLD_VIRTUAL_PYTHONHOME
+   fi
+}
+
+
+which_or_warn () {
+   if [ -n "$1" ]; then
+      if which "$1"; then
+         return 0
+      else
+         warn "Not found in system path: $1"
+      fi
+   fi
+   return 1
+}
+
+
+match_by_print () {
+   local cmd="from sys import stdout, version_info as vi; stdout.write('python'+($1)+'\\n')"
+   activate
+   local name="$(python -c "$cmd")"
+   deactivate
+   which_or_warn "$name"
+   return $?
+}
+
+
+match_by_file () {
+   if [ -n "${2+_}" ]; then
+      warn "Multiple possibilities: $@"
+      return 1
+   elif [ -f "$1" -o -L "$1" ]; then
+      which_or_warn "$1"
+      return $?
+   fi
+}
+
+
+match_version_minor () {
+   match_by_print '"%s.%s" % (vi.major, vi.minor)' || match_by_file python[23].*
+   return $?
+}
+
+
+match_version_major () {
+   match_by_print '"%s" % vi.major' || match_by_file python[23]
+   return $?
+}
+
+
+recover_reqs () {
+   if [ -n "$TEMP_REQS" ]; then
+      if cd -- "$START_CWD" && \
+         local recover_reqs=$(mktemp requirements.venv-reboot.txt.XXXXXXXX) && \
+         mv "$TEMP_REQS" "$recover_reqs"
+      then
+         TEMP_REQS="$(pwd)/$recover_reqs"
+      warn "Failed to reinstall dependencies. Dependency list has been left in $TEMP_REQS"
+   fi
+}
+
 
 [ -z "$VIRTUAL_ENV" ] || die 'Deactivate your current virtualenv first!'
-[ ! -z "$1" ] || die 'Specify a path to a virtualenv.'
-cd -- "$1" || die "Couldn't chdir to $1"
 
+
+while getopts 'hjst' opt; do
+   case $opt in
+      h) HELP=1 ;;
+      j) MATCH_MAJOR=1 ;;
+      s) SKIP_PIP=1 ;;
+      t) TEST=1 ;;
+      *) usage ;;
+   esac
+done
+
+
+if [ "$HELP" == "1" ]; then
+   usage
+fi
+
+
+shift $(($OPTIND - 1))
+if [ -z "$1" ]; then
+   echo 'Specify a path to a virtualenv.'
+   usage
+elif [ -n "$2" ]; then
+   echo 'Specify exactly 1 path to a virtualenv.'
+   usage
+fi
+
+START_CWD="$(pwd)"
+cd -- "$1" || die "Couldn't chdir to $1"
 VIRTUAL_ENV="$(pwd)"
 export VIRTUAL_ENV
-echo VIRTUAL_ENV=$VIRTUAL_ENV
 
-[ -L "$VENV_MARKER" ] || die "Couldn't find $VENV_MARKER in $VIRTUAL_ENV. Is it a virtualenv?"
-pushd bin || die "Couldn't chdir to $VIRTUAL_ENV/bin. Is it a virtualenv?"
+cd bin || die "Couldn't chdir to $VIRTUAL_ENV/bin. Is it a virtualenv?"
 
 
-# ---- from original activate script ----
-
-_OLD_VIRTUAL_PATH="$PATH"
-PATH="$VIRTUAL_ENV/bin:$PATH"
-export PATH
-
-# unset PYTHONHOME if set
-if ! [ -z "${PYTHONHOME+_}" ] ; then
-    _OLD_VIRTUAL_PYTHONHOME="$PYTHONHOME"
-    unset PYTHONHOME
-fi
-
-# ---- END from original activate script ----
-
-
-# snapshot current dependencies
-
-TEMP_REQS=""
-pip -V && TEMP_REQS="$(mktemp -t venvreboot)"
-[ ! -z "$TEMP_REQS" ] && pip freeze > "$TEMP_REQS" || \
-   warn 'Failed to preserve dependencies. Stopping.'
-
-echo TEMP_REQS=$TEMP_REQS
-
-
-# deactivate
-
-PATH="$_OLD_VIRTUAL_PATH"
-export PATH
-unset _OLD_VIRTUAL_PATH
-
-if ! [ -z "${_OLD_VIRTUAL_PYTHONHOME+_}" ] ; then
-   PYTHONHOME="$_OLD_VIRTUAL_PYTHONHOME"
-   export PYTHONHOME
-   unset _OLD_VIRTUAL_PYTHONHOME
-fi
-
-
-# try and figure out what version of python has been symlinked in here
+# determine python version in this venv
 
 PYTHON_PATH=""
-#if $TODO_MATCH_MINOR_VERSION; then
-PYTHON_PATH="$(maybe_which python[23].*)"
-if [ -z "$PYTHON_PATH" ]; then
-   warn "Couldn't determine minor version of this virtualenv. Will try to match major version."
+if [ -z "$MATCH_MAJOR" ]; then
+   PYTHON_PATH=$(match_version_minor)
+   if [ -z "$PYTHON_PATH" ]; then
+      warn "Couldn't determine minor version of this virtualenv. Will try to match major version."
+   fi
 fi
-#fi
 
 if [ -z "$PYTHON_PATH" ]; then
-   PYTHON_PATH="$(maybe_which python[23])"
+   PYTHON_PATH=$(match_version_major)
 fi
 
 if [ -z "$PYTHON_PATH" ]; then
    die "Couldn't determine major version of this virtualenv. Stopping."
-else
-   echo "Recreating virtualenv with $PYTHON_PATH"
+fi
+
+
+if [ -n "$TEST" ]; then
+   echo "Would recreate the virtualenv with the following interpreter:"
+   echo $PYTHON_PATH
+   exit 0
+fi
+
+
+# preserve dependencies
+
+TEMP_REQS=""
+if [ -z "$SKIP_PIP" ]; then
+   activate
+   pip -V && TEMP_REQS="$(mktemp -t venvreboot)"
+   [ -n "$TEMP_REQS" ] && pip freeze > "$TEMP_REQS" || \
+      die "Couldn't run pip to preserve dependencies."
+   deactivate
 fi
 
 
 # destroy venv
 
-popd
+cd -- "$VIRTUAL_ENV"
 for dir in bin include lib share; do
-   [ -d "$dir" ] && [ ! -L "$dir" ] && rm -r "$dir"
+   [ -d "$dir" -a ! -L "$dir" ] && rm -r "$dir"
 done
-rm .Python
+rm .Python pyvenv.cfg
 cd ..
-rmdir "$VIRTUAL_ENV" || warn "Couldn't delete virtualenv."
+if ! rmdir "$VIRTUAL_ENV"; then
+   warn "Couldn't delete directory $VIRTUAL_ENV. Following files remain:"
+   cd "$VIRTUAL_ENV" && find . -type f && cd ..
+fi
 
 
-# create new venv
+# create new virtualenv
 
-virtualenv -p "$PYTHON_PATH" "$VIRTUAL_ENV" || die "Recreation of virtualenv failed."
+echo "Recreating virtualenv with $PYTHON_PATH"
+if ! virtualenv -p "$PYTHON_PATH" "$VIRTUAL_ENV"; then
+   recover_reqs
+   die "Recreation of virtualenv failed."
+fi
 
-if [ ! -z "$TEMP_REQS" ]; then
-   cd "$VIRTUAL_ENV" && \
-      . bin/activate && \
-      pip install -r "$TEMP_REQS" || (
-         RECOVER_REQS=$(mktemp requirements.txt.XXXXXXXX)
-         cp "$TEMP_REQS" "$RECOVER_REQS"
-         warn "Failed to reinstall dependencies. Dependency list has been left in $RECOVER_REQS"
-      )
-   rm "$TEMP_REQS"
+if [ -n "$TEMP_REQS" ]; then
+   echo 'Restoring dependencies'
+   if cd -- "$VIRTUAL_ENV" && \
+      source bin/activate && \
+      pip install -r "$TEMP_REQS"
+   then
+      echo 'Dependencies restored'
+      rm "$TEMP_REQS"
+
+   else
+      recover_reqs
+   fi
 fi
