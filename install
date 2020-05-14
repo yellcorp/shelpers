@@ -18,6 +18,17 @@ except NameError:
 	read_input = input
 
 
+SHELLS = dict(
+	bash=dict(startup_file='~/.bash_profile'),
+	zsh=dict(startup_file='~/.zshrc'),
+)
+def detect_shell():
+	shell = os.environ.get('SHELL', None)
+	if not shell:
+		return None
+	return os.path.basename(shell)
+
+
 def bool_prompt(prompt):
 	use_prompt = str(prompt)
 	while True:
@@ -45,6 +56,17 @@ Scripts cannot be run from here because the path name contains a colon (':').
 This prevents it from being added to $PATH.""")
 		return 2
 
+	shell_name = detect_shell()
+	if not shell_name:
+		print("""\
+Couldn't detect which shell you are using, because the SHELL var isn't set.""")
+		return 2
+
+	shell_info = SHELLS.get(shell_name, None)
+	if shell_info is None:
+		print("The {!r} shell is not supported.".format(shell_name))
+		return 2
+
 	home = os.environ.get("HOME")
 	if home is not None and here.startswith(home):
 		payload_sq = "\"$HOME\"%s" % shell_quote(here[len(home):])
@@ -56,17 +78,17 @@ This prevents it from being added to $PATH.""")
 	lines = [
 		'PATH="$PATH":%s' % payload_sq,
 		'export PATH',
-		'for file in %s/profile.d/*.bash; do' % payload_sq,
+		'for file in %s/profile.d/init-*; do' % payload_sq,
 		'\t[ -r "$file" ] && . "$file"',
 		'done',
 	]
 
-	profile_path = os.path.expanduser("~/.bash_profile")
+	startup_file = os.path.expanduser(shell_info['startup_file'])
 
-	if not os.path.exists(profile_path):
-		print("The file %r will be created." % profile_path)
+	if not os.path.exists(startup_file):
+		print("The file %r will be created." % startup_file)
 
-	print("The following lines will be added to %r:" % profile_path)
+	print("The following lines will be added to %r:" % startup_file)
 	print()
 	for line in lines:
 		print(line)
@@ -86,7 +108,7 @@ This prevents it from being added to $PATH.""")
 		"# Following %d lines added by %s" % (len(lines), self_id)
 	]
 
-	with open(profile_path, "a") as profile_stream:
+	with open(startup_file, "a") as profile_stream:
 		for line in lines:
 			print(line, file = profile_stream)
 	
