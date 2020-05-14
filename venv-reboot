@@ -83,19 +83,20 @@ which_or_warn () {
 
 match_by_print () {
    local cmd="from sys import stdout, version_info as vi; stdout.write('python'+($1)+'\\n')"
+   local pyname
    activate
-   local name="$(python -c "$cmd")"
+   pyname="$(python -c "$cmd")"
    deactivate
-   which_or_warn "$name"
+   which_or_warn "$pyname"
    return $?
 }
 
 
 match_by_file () {
    if [ -n "${2+_}" ]; then
-      warn "Multiple possibilities: $@"
+      warn "Multiple possibilities: $*"
       return 1
-   elif [ -f "$1" -o -L "$1" ]; then
+   elif [ -f "$1" ] || [ -L "$1" ]; then
       which_or_warn "$1"
       return $?
    fi
@@ -115,12 +116,14 @@ match_version_major () {
 
 
 recover_reqs () {
+   local recover_reqs
    if [ -n "$TEMP_REQS" ]; then
       if cd -- "$START_CWD" && \
-         local recover_reqs=$(mktemp requirements.venv-reboot.txt.XXXXXXXX) && \
+         recover_reqs=$(mktemp requirements.venv-reboot.txt.XXXXXXXX) && \
          mv "$TEMP_REQS" "$recover_reqs"
       then
          TEMP_REQS="$(pwd)/$recover_reqs"
+      fi
       warn "Failed to reinstall dependencies. Dependency list has been left in $TEMP_REQS"
    fi
 }
@@ -155,7 +158,7 @@ elif [ -n "$2" ]; then
 fi
 
 START_CWD="$(pwd)"
-cd -- "$1" || die "Couldn't chdir to $1"
+cd -- "$1" || exit 1
 VIRTUAL_ENV="$(pwd)"
 export VIRTUAL_ENV
 
@@ -183,7 +186,7 @@ fi
 
 if [ -n "$TEST" ]; then
    echo "Would recreate the virtualenv with the following interpreter:"
-   echo $PYTHON_PATH
+   echo "$PYTHON_PATH"
    exit 0
 fi
 
@@ -202,9 +205,9 @@ fi
 
 # destroy venv
 
-cd -- "$VIRTUAL_ENV"
+cd -- "$VIRTUAL_ENV" || exit 1
 for dir in bin include lib share; do
-   [ -d "$dir" -a ! -L "$dir" ] && rm -r "$dir"
+   [ -d "$dir" ] && [ ! -L "$dir" ] && rm -r "$dir"
 done
 rm .Python pyvenv.cfg
 cd ..
