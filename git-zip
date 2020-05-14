@@ -12,7 +12,7 @@ if [[ -z "$TOPLEVEL" ]]; then
 	exit 1
 fi
 
-cd "$TOPLEVEL"
+cd "$TOPLEVEL" || exit 1
 
 BASENAME="$(basename -- "$TOPLEVEL")"
 TIMESTAMP="$(date +"$TIMESTAMP_FORMAT")"
@@ -21,5 +21,20 @@ if [[ -z "$HASH" ]]; then
 	exit 1
 fi
 
-ZIPNAME="$BASENAME-$TIMESTAMP-$HASH.zip"
-git ls-files | zip -9 -@ "$ZIPNAME"
+ARCHIVENAME="$BASENAME-$TIMESTAMP-$HASH"
+MYNAME="$(basename -- "$0")"
+case "$MYNAME" in
+	git-tgz)
+		export GZIP=-9
+		git ls-files | tar -T - -nczvf "$ARCHIVENAME.tar.gz"
+		;;
+	git-tbz)
+		git ls-files | tar -T - -ncjvf "$ARCHIVENAME.tar.bz2"
+		;;
+	*)
+		if [[ "$MYNAME" != "git-zip" ]]; then
+			echo "Don't know what format to make, so zip it is" 1>&2
+		fi
+		git ls-files | zip -9 -@ "$ARCHIVENAME.zip"
+		;;
+esac
