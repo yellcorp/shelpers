@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 invoked="$(basename -- "$0")"
 
 py_exec=python

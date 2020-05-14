@@ -1,2 +1,2 @@
-#!/bin/bash
+#!/bin/sh
 exec open -b com.ridiculousfish.HexFiend "$@"
