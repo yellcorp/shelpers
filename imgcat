@@ -118,8 +118,8 @@ def get_arg_parser():
             The size at which to display the image. If specified as dimensions
             #x#, the image will be proportionately scaled down to fit if
             necessary.  If a single dimension is specified, the image's width
-            will be scaled to this. If a percentage #%, the image will be
-            scaled by that amount.  Specify 100% to display it without
+            will be scaled to this. If a percentage #%%, the image will be
+            scaled by that amount.  Specify 100%% to display it without
             transformation.  The default is %(default)s.
         """
     )
