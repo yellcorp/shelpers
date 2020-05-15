@@ -2,7 +2,7 @@
 invoked="$(basename -- "$0")"
 
 py_exec=python
-if [ $invoked == 'pylint3' ]; then
+if [ "$invoked" = pylint3 ]; then
 	py_exec=python3
 fi
 
