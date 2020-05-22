@@ -1,8 +1,11 @@
 # Usage: python install
 
-# Will edit or create your ~/.bash_profile to add the parent directory of this
-# file to your PATH, and source every *.bash file in ./profile.d/
-
+# Will edit one of your shell startup files to add the parent directory of this
+# file to your PATH, and source every init-* file in ./profile.d/
+# 
+# For bash, edits .bash_profile
+# For zsh, edits .zshrc
+#
 # Proposed edits are shown before prompting for confirmation.
 
 
