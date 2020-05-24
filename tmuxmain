@@ -1,0 +1,2 @@
+#!/bin/sh
+exec tmux -CC new -A -s main
