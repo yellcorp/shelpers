@@ -16,3 +16,6 @@ cdof()
 # Run screensaver immediately. Effectively a screen lock if a password is
 # required to exit the screensaver.
 alias screensaver='open -a ScreenSaverEngine'
+
+# Python virtualenv
+alias vba='source venv/bin/activate'
