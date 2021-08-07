@@ -5,8 +5,8 @@ import subprocess
 import sys
 import tempfile
 
-from shelpers.shell import cli_filename
-from shelpers.errors import ErrorReporter
+from utils.shell import cli_filename
+from utils.errors import ErrorReporter
 
 
 def get_arg_parser():

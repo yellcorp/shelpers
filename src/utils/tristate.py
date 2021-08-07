@@ -3,13 +3,25 @@ from argparse import ArgumentParser
 from typing import Optional
 
 
+class TriState(enum.Enum):
+    NO = enum.auto()
+    YES = enum.auto()
+    INDETERMINATE = enum.auto()
+
+
+def to_tristate(value: Optional[bool]):
+    if value is None:
+        return TriState.INDETERMINATE
+    return TriState.YES if value else TriState.NO
+
+
 # This stuff wasn't added to stock argparse until py3.9
 def add_tristate_argument(
     arg_parser: ArgumentParser,
-    positive_flag,
-    positive_help,
-    negative_help,
-    default_help=None,
+    positive_flag: str,
+    positive_help: str,
+    negative_help: str,
+    default_help: Optional[str] = None,
 ):
     flag_char = positive_flag[0]
     if flag_char not in arg_parser.prefix_chars:
@@ -43,15 +55,3 @@ def add_tristate_argument(
         dest=dest,
         help=negative_help,
     )
-
-
-class TriState(enum.Enum):
-    NO = enum.auto()
-    YES = enum.auto()
-    INDETERMINATE = enum.auto()
-
-
-def to_tristate(value: Optional[bool]):
-    if value is None:
-        return TriState.INDETERMINATE
-    return TriState.YES if value else TriState.NO

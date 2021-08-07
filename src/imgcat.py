@@ -5,14 +5,14 @@ from functools import partial
 
 import PIL.Image
 
-from shelpers.image import (
+from utils.image import (
     Scaler,
     composite_checkerboard,
     deref_palette,
     image_has_transparency,
     is_image_filename,
 )
-from shelpers.terminal import iterm_encode_image
+from utils.iterm import iterm_encode_image
 
 CHECKER_SIZE = 16
 CHECKER_COLORS = (

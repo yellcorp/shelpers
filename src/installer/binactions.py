@@ -1,34 +1,16 @@
-import functools
 import os
 import shlex
 from pathlib import Path
-from typing import Optional, Iterator, NamedTuple
+from typing import Iterator, Optional, NamedTuple, Union, Iterable, Any
 
-from shelpers.shell import script_text, ALL_ARGS_QUOTED
+from utils.fs import to_path
+from utils.shell import ALL_ARGS_QUOTED, script_text
+from .fsactions import FileAction, ScriptFile, Symlink
 
 _SH_SCRIPT_TEMPLATE = """\
 #!/bin/sh
 {command}
 """
-
-
-def to_path(p):
-    return Path(os.fspath(p))
-
-
-def yes_or_no(prompt: str) -> bool:
-    while True:
-        response = input(prompt).lower()
-        if response:
-            if "yes".startswith(response):
-                return True
-            if "no".startswith(response):
-                return False
-        print("Enter y or n, or press Control-D to cancel")
-
-
-def yes_or_no_requester(prompt: str):
-    return functools.partial(yes_or_no, prompt)
 
 
 class InstallContext(NamedTuple):
@@ -37,57 +19,29 @@ class InstallContext(NamedTuple):
     pipfile: Path
 
 
-class FileCommand:
-    def get_path(self) -> Path:
-        raise NotImplementedError()
-
-    def execute(self):
+class BinAction:
+    def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         raise NotImplementedError()
 
 
-class ScriptFile(FileCommand):
-    def __init__(self, path: Path, source: str):
-        self.path = path
-        self.source = source
+class PipenvPython(BinAction):
+    def __init__(self, py_name: Union[str, Iterable[Any]], name: Optional[str] = None):
+        if isinstance(py_name, str):
+            self.py_name = py_name
+            self.extra_args = []
+        else:
+            i = iter(py_name)
+            self.py_name = next(i)
+            self.extra_args = list(i)
 
-    def get_path(self) -> Path:
-        return self.path
-
-    def execute(self):
-        with open(self.path, "w", encoding="utf-8") as writer:
-            writer.write(self.source)
-        self.path.chmod(0o755)
-
-
-class Symlink(FileCommand):
-    def __init__(self, link_path: Path, link_content: str):
-        self.link_path = link_path
-        self.link_content = link_content
-
-    def get_path(self) -> Path:
-        return self.link_path
-
-    def execute(self):
-        os.symlink(self.link_content, self.link_path)
-
-
-class BinCommand:
-    def get_plan(self, context: InstallContext) -> Iterator[FileCommand]:
-        raise NotImplementedError()
-
-
-class PipenvPython(BinCommand):
-    def __init__(self, py_name: str, name: Optional[str] = None, *insert_args):
-        self.py_name = py_name
         self.name = name or to_path(self.py_name).stem
-        self.insert_args = insert_args
 
-    def get_plan(self, context: InstallContext) -> Iterator[FileCommand]:
+    def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         pipfile = shlex.quote(str(context.pipfile.absolute()))
 
         env = f"PIPENV_PIPFILE={pipfile}"
         command = ["pipenv", "run", "python", context.root / self.py_name]
-        command.extend(str(a) for a in self.insert_args)
+        command.extend(self.extra_args)
         command.append(ALL_ARGS_QUOTED)
 
         text = f"{env} {script_text(command)}"
@@ -96,11 +50,11 @@ class PipenvPython(BinCommand):
         yield ScriptFile(context.bin / self.name, src)
 
 
-class Opener(BinCommand):
+class Opener(BinAction):
     def __init__(self, name: str):
         self.name = name
 
-    def get_plan(self, context: InstallContext) -> Iterator[FileCommand]:
+    def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         src = _SH_SCRIPT_TEMPLATE.format(command=script_text(self.get_command()))
         yield ScriptFile(context.bin / self.name, src)
 
@@ -138,12 +92,12 @@ class BundleOpener(Opener):
         return ["exec", "/usr/bin/open", "-b", self.bundle_id, ALL_ARGS_QUOTED]
 
 
-class Link(BinCommand):
+class Link(BinAction):
     def __init__(self, link_target, link_name=None):
         self.link_target = link_target
         self.link_name = link_name
 
-    def get_plan(self, context: InstallContext) -> Iterator[FileCommand]:
+    def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         link_target = to_path(self.link_target)
         if not link_target.is_absolute():
             link_target = context.root / link_target

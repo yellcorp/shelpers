@@ -17,7 +17,7 @@ class Scaler:
             return image
 
         return image.resize(
-            [max(1, int(axis * factor + 0.5)) for axis in image.size], self.filter
+            [int(axis * factor + 0.5) for axis in image.size], self.filter
         )
 
     def image_scale_down_by_factor(self, image, factor):

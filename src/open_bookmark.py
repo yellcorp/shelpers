@@ -1,8 +1,7 @@
-import subprocess
-
 import sys
 
-from shelpers.bookmarks import bookmark
+from config.bookmarks import bookmark
+from utils.subproc import run_check_noinput
 
 
 def main():
@@ -10,10 +9,8 @@ def main():
     func = bookmark[func_name]
     url = func(sys.argv[2:])
 
-    subprocess.run(
-        ["open", str(url)],
-        stdin=subprocess.DEVNULL,
-        check=True,
+    run_check_noinput(
+        ("open", str(url)),
     )
 
 

@@ -1,4 +1,5 @@
 import collections.abc
+import functools
 import subprocess
 from typing import Container, Union, Callable
 
@@ -26,3 +27,12 @@ def subprocess_error_if(
             stderr=cp.stderr,
         )
     return cp
+
+
+run_check_noinput = functools.partial(
+    subprocess.run, check=True, stdin=subprocess.DEVNULL
+)
+
+
+def run_stdout(cmd):
+    return run_check_noinput(cmd, stdout=subprocess.PIPE).stdout
