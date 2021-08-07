@@ -1,2 +1,0 @@
-#!/bin/sh
-exec open -b net.sourceforge.grandperspectiv "$@"

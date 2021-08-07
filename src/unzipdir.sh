@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# todo: support multiple archive formats
+for ZIPFILE in "$@"; do
+	DESTDIR="${ZIPFILE%.zip}"
+	if [ "$ZIPFILE" = "$DESTDIR" ]; then
+		DESTDIR="${DESTDIR}.d"
+	fi
+
+	if [ -d "$DESTDIR" ]; then
+		echo "$0: $ZIPFILE: skipping because directory '$DESTDIR' exists" 1>&2
+	else
+		mkdir -p "$DESTDIR" && \
+			unzip "$ZIPFILE" -d "$DESTDIR" 1>&2 && \
+			echo "$ZIPFILE"
+	fi
+done

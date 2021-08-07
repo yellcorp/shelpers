@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pillow = "*"
+
+[dev-packages]
+black = "21.7b0"
+
+[requires]
+python_version = "${python_version}"
+
+[pipenv]
+allow_prereleases = true
+
+[scripts]
+format = "black src"

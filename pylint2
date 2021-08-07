@@ -1,9 +1,0 @@
-#!/bin/sh
-invoked="$(basename -- "$0")"
-
-py_exec=python
-if [ "$invoked" = pylint3 ]; then
-	py_exec=python3
-fi
-
-"$py_exec" -c 'import pylint; pylint.run_pylint()' "$@"
