@@ -9,7 +9,6 @@ scripts = [
     Link("src/git-reset-perms.sh"),
     Link("src/myip.sh"),
     Link("src/tmuxmain.sh"),
-    Link("src/unzipdir.sh"),
     Link("src/vnc.sh"),
     Link("src/sheet_new.sh", "sheet.new"),
     Link("src/finder-set-hidden.sh", "finder-set-hidden"),
@@ -21,6 +20,7 @@ scripts = [
     PipenvPython("src/imgcat.py"),
     PipenvPython("src/jpegopt.py"),
     PipenvPython("src/trash.py"),
+    PipenvPython("src/unzipdir.py"),
 ]
 
 bookmarks = [
