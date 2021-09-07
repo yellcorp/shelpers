@@ -12,3 +12,17 @@ cdof()
 	echo $container
 	cd -- "$container"
 }
+
+gox64()
+{
+	local current="$(/usr/bin/arch)"
+	case "$current" in
+		i386|x86_64|x86_64h)
+			echo "$0: Already running Intel (arch=$current)" 1>&2
+			return 1
+			;;
+		*)
+			/usr/bin/arch -x86_64 "$SHELL"
+			;;
+	esac
+}
