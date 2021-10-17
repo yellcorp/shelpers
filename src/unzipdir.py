@@ -56,7 +56,7 @@ def extract_7z(archive: Path, out_dir: Path):
 
 def extract_zip(archive: Path, out_dir: Path):
     subprocess.run(
-        ['unzip', archive, '-d', os.curdir],
+        ['unzip', archive.absolute(), '-d', os.curdir],
         cwd=out_dir,
         check=True
     )
