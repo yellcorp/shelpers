@@ -1,6 +1,7 @@
 import os
 import re
 import shlex
+import traceback
 from collections import OrderedDict
 from string import Template
 from typing import Iterable, Callable
@@ -225,7 +226,14 @@ class InstallJob:
         plan = OrderedDict()
 
         for item in self.manifest:
-            for p in item.get_plan(context):
+            try:
+                plan = item.get_plan(context)
+            except Exception:
+                print(f"Error evaluating install plan for {item!r}")
+                traceback.print_exc()
+                continue
+
+            for p in plan:
                 path = p.get_path()
                 k = str(path)
                 if k in plan:

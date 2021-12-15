@@ -36,6 +36,13 @@ class PipenvPython(BinAction):
 
         self.name = name or to_path(self.py_name).stem
 
+    def __repr__(self):
+        return (
+            "{0.__class__.__name__}"
+            "({1!r},"
+            " {0.name!r})"
+        ).format(self, [self.py_name] + self.extra_args)
+
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         env = dict(
             PIPENV_PIPFILE=context.pipfile.absolute(),
@@ -58,6 +65,12 @@ class Opener(BinAction):
     def __init__(self, name: str):
         self.name = name
 
+    def __repr__(self):
+        return (
+            "{0.__class__.__name__}"
+            "({0.name!r})"
+        ).format(self)
+
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         src = _SH_SCRIPT_TEMPLATE.format(command=script_text(self.get_command()))
         yield ScriptFile(context.bin / self.name, src)
@@ -78,6 +91,13 @@ class PathOpener(Opener):
             name = to_path(path).stem
         super().__init__(name)
 
+    def __repr__(self):
+        return (
+            "{0.__class__.__name__}"
+            "({0.name!r},"
+            " {0.path!r})"
+        ).format(self)
+
     def get_command(self):
         return ["exec", "/usr/bin/open", "-a", os.fspath(self.path), ALL_ARGS_QUOTED]
 
@@ -92,6 +112,13 @@ class BundleOpener(Opener):
         super().__init__(name)
         self.bundle_id = bundle_id
 
+    def __repr__(self):
+        return (
+            "{0.__class__.__name__}"
+            "({0.bundle_id!r},"
+            " {0.name!r})"
+        ).format(self)
+
     def get_command(self):
         return ["exec", "/usr/bin/open", "-b", self.bundle_id, ALL_ARGS_QUOTED]
 
@@ -100,6 +127,13 @@ class Link(BinAction):
     def __init__(self, link_target, link_name=None):
         self.link_target = link_target
         self.link_name = link_name
+
+    def __repr__(self):
+        return (
+            "{0.__class__.__name__}"
+            "({0.link_target!r},"
+            " {0.link_name!r})"
+        ).format(self)
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         link_target = to_path(self.link_target)
