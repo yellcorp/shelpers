@@ -9,6 +9,7 @@ from typing import Iterable, Callable
 import sys
 
 from utils.fs import to_path
+from utils.macos.appbundle import BundleError
 from utils.subproc import run_check_noinput, run_stdout
 from utils.text import u8open
 from utils.tristate import TriState
@@ -227,20 +228,18 @@ class InstallJob:
 
         for item in self.manifest:
             try:
-                item_plan = item.get_plan(context)
-            except Exception:
-                print(f"Error evaluating install plan for {item!r}")
+                for p in item.get_plan(context):
+                    path = p.get_path()
+                    k = str(path)
+                    if k in plan:
+                        raise ValueError(
+                            f"Multiple entries in manifest attempting to write to the same file {k!r}"
+                        )
+                    plan[k] = p
+            except BundleError:
+                print(f"Skipping {item!r} due to non-critical error")
                 traceback.print_exc()
                 continue
-
-            for p in item_plan:
-                path = p.get_path()
-                k = str(path)
-                if k in plan:
-                    raise ValueError(
-                        f"Multiple entries in manifest attempting to write to the same file {k!r}"
-                    )
-                plan[k] = p
 
         for command in plan.values():
             receipt_path = command.get_path().relative_to(self.bin_path)

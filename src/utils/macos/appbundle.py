@@ -9,6 +9,10 @@ from typing import Optional, Iterable, List
 MDFIND = "/usr/bin/mdfind"
 
 
+class BundleError(Exception):
+    pass
+
+
 def find_all_apps_by_bundle_id(bundle_id: str) -> List[str]:
     escaped = re.sub(r"[\x22\x27\x2A\x3F\x5C]", r"\\\g<0>", bundle_id)
     quoted = f'"{escaped}"'
@@ -31,7 +35,7 @@ def find_app_by_bundle_id(bundle_id: str) -> Optional[str]:
         return None
     if len(paths) == 1:
         return paths[0]
-    raise ValueError("Multiple results")
+    raise BundleError(f"Multiple results (bundle_id={bundle_id!r})")
 
 
 class BundlePath:
@@ -60,7 +64,7 @@ class BundlePath:
     def evaluate(self):
         app_path = find_app_by_bundle_id(self.bundle_id)
         if app_path is None:
-            raise ValueError(
+            raise BundleError(
                 f"Application bundle not found (bundle_id={self.bundle_id!r})"
             )
         base = pathlib.Path(app_path)
