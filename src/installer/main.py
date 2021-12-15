@@ -227,13 +227,13 @@ class InstallJob:
 
         for item in self.manifest:
             try:
-                plan = item.get_plan(context)
+                item_plan = item.get_plan(context)
             except Exception:
                 print(f"Error evaluating install plan for {item!r}")
                 traceback.print_exc()
                 continue
 
-            for p in plan:
+            for p in item_plan:
                 path = p.get_path()
                 k = str(path)
                 if k in plan:
