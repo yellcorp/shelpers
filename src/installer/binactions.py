@@ -37,14 +37,18 @@ class PipenvPython(BinAction):
         self.name = name or to_path(self.py_name).stem
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
-        pipfile = shlex.quote(str(context.pipfile.absolute()))
+        env = dict(
+            PIPENV_PIPFILE=context.pipfile.absolute(),
+            PIPENV_IGNORE_VIRTUALENVS=1,
+            PIPENV_VERBOSITY=-1,
+        )
+        env_prefix = ' '.join(f'{k}={shlex.quote(str(v))}' for k, v in env.items())
 
-        env = f"PIPENV_PIPFILE={pipfile}"
         command = ["pipenv", "run", "python", context.root / self.py_name]
         command.extend(self.extra_args)
         command.append(ALL_ARGS_QUOTED)
 
-        text = f"{env} {script_text(command)}"
+        text = f"{env_prefix} {script_text(command)}"
 
         src = _SH_SCRIPT_TEMPLATE.format(command=text)
         yield ScriptFile(context.bin / self.name, src)
