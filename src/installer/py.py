@@ -9,7 +9,7 @@ from .errors import InstallError
 
 def python_check(executable_names: Iterable[str], version: Tuple[int, int]):
     if os.environ.get("VIRTUAL_ENV"):
-        raise InstallError("Not running with a virtualenv active")
+        raise InstallError("Refusing to run installer while a virtualenv is active")
 
     required_major_version, min_minor_version = version
     formatted_version = f"{required_major_version}.{min_minor_version}"
