@@ -7,13 +7,9 @@ name = "pypi"
 pillow = "*"
 
 [dev-packages]
-black = "21.7b0"
 
 [requires]
 python_version = "${python_version}"
-
-[pipenv]
-allow_prereleases = true
 
 [scripts]
 format = "black src"
