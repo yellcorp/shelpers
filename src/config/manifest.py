@@ -19,6 +19,7 @@ scripts = [
     Link("src/git-zip.sh", "git-tgz"),
     PipenvPython("src/imgcat.py"),
     PipenvPython("src/jpegopt.py"),
+    PipenvPython("src/pipenv-unused.py"),
     PipenvPython("src/trash.py"),
     PipenvPython("src/unzipdir.py"),
 ]
