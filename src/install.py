@@ -60,11 +60,11 @@ PYTHON3_MIN_VERSION = (3, 8)
 
 
 def check_pipenv_version(version: bytes) -> bool:
-    return bool(re.match(br"^pipenv, version 202\d\.", version))
+    return bool(re.match(rb"^pipenv, version 202\d\.", version))
 
 
 def check_pipx_version(version: bytes) -> bool:
-    return bool(re.match(br"^1\.1\.\d+$", version))
+    return bool(re.match(rb"^1\.1\.\d+$", version))
 
 
 def main():

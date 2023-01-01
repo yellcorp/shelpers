@@ -20,7 +20,7 @@ def python_check(executable_names: Iterable[str], version: Tuple[int, int]):
         except subprocess.CalledProcessError:
             continue
 
-        version_match = re.match(br"Python (\d+)\.(\d+)\.", exe_version)
+        version_match = re.match(rb"Python (\d+)\.(\d+)\.", exe_version)
         if version_match:
             exe_major = int(version_match[1])
             exe_minor = int(version_match[2])

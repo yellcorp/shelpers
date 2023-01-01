@@ -37,11 +37,9 @@ class PipenvPython(BinAction):
         self.name = name or to_path(self.py_name).stem
 
     def __repr__(self):
-        return (
-            "{0.__class__.__name__}"
-            "({1!r},"
-            " {0.name!r})"
-        ).format(self, [self.py_name] + self.extra_args)
+        return ("{0.__class__.__name__}" "({1!r}," " {0.name!r})").format(
+            self, [self.py_name] + self.extra_args
+        )
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         env = dict(
@@ -49,7 +47,7 @@ class PipenvPython(BinAction):
             PIPENV_IGNORE_VIRTUALENVS=1,
             PIPENV_VERBOSITY=-1,
         )
-        env_prefix = ' '.join(f'{k}={shlex.quote(str(v))}' for k, v in env.items())
+        env_prefix = " ".join(f"{k}={shlex.quote(str(v))}" for k, v in env.items())
 
         command = ["pipenv", "run", "python", context.root / self.py_name]
         command.extend(self.extra_args)
@@ -66,10 +64,7 @@ class Opener(BinAction):
         self.name = name
 
     def __repr__(self):
-        return (
-            "{0.__class__.__name__}"
-            "({0.name!r})"
-        ).format(self)
+        return ("{0.__class__.__name__}" "({0.name!r})").format(self)
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         src = _SH_SCRIPT_TEMPLATE.format(command=script_text(self.get_command()))
@@ -92,11 +87,7 @@ class PathOpener(Opener):
         super().__init__(name)
 
     def __repr__(self):
-        return (
-            "{0.__class__.__name__}"
-            "({0.name!r},"
-            " {0.path!r})"
-        ).format(self)
+        return ("{0.__class__.__name__}" "({0.name!r}," " {0.path!r})").format(self)
 
     def get_command(self):
         return ["exec", "/usr/bin/open", "-a", os.fspath(self.path), ALL_ARGS_QUOTED]
@@ -113,11 +104,9 @@ class BundleOpener(Opener):
         self.bundle_id = bundle_id
 
     def __repr__(self):
-        return (
-            "{0.__class__.__name__}"
-            "({0.bundle_id!r},"
-            " {0.name!r})"
-        ).format(self)
+        return ("{0.__class__.__name__}" "({0.bundle_id!r}," " {0.name!r})").format(
+            self
+        )
 
     def get_command(self):
         return ["exec", "/usr/bin/open", "-b", self.bundle_id, ALL_ARGS_QUOTED]
@@ -130,9 +119,7 @@ class Link(BinAction):
 
     def __repr__(self):
         return (
-            "{0.__class__.__name__}"
-            "({0.link_target!r},"
-            " {0.link_name!r})"
+            "{0.__class__.__name__}" "({0.link_target!r}," " {0.link_name!r})"
         ).format(self)
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
