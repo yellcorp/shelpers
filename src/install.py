@@ -64,7 +64,7 @@ def check_pipenv_version(version: bytes) -> bool:
 
 
 def check_pipx_version(version: bytes) -> bool:
-    return bool(re.match(rb"^1\.1\.\d+$", version))
+    return bool(re.match(rb"^1\.[12]\.\d+$", version))
 
 
 def main():
