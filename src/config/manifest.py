@@ -17,6 +17,7 @@ scripts = [
     Link("src/git-zip.sh", "git-zip"),
     Link("src/git-zip.sh", "git-tbz"),
     Link("src/git-zip.sh", "git-tgz"),
+    PipenvPython("src/bridge.py"),
     PipenvPython("src/imgcat.py"),
     PipenvPython("src/jpegopt.py"),
     PipenvPython("src/pipenv-unused.py"),
@@ -33,7 +34,6 @@ launchers = [
     #
     # generate launchers
     #
-    BundleOpener("com.adobe.bridge11", "bridge"),
     BundleOpener("net.sourceforge.grandperspectiv", "gpersp"),
     BundleOpener("com.ridiculousfish.HexFiend", "hex"),
     BundleOpener("com.adobe.Photoshop", "photoshop"),
