@@ -35,14 +35,15 @@ def jpegopt_with_tempfile(path, temp_file):
         reporter.print_error("Could not get file size.", env_err, path)
         input_size = None
 
-    exit_code = subprocess.run(
-        ("jpegtran", "-copy", "none", "-optimize", cli_filename(path)),
+    run_result = subprocess.run(
+        ("jpegtran", "-copy", "icc", "-optimize", cli_filename(path)),
         stdout=temp_file,
     )
+    exit_code = run_result.returncode
 
     replace = True
     if exit_code != 0:
-        reporter.print_error("jpegtran failed.", subject_file=path)
+        reporter.print_error(f"jpegtran failed {exit_code=}.", subject_file=path)
         replace = False
 
     elif input_size is not None:
