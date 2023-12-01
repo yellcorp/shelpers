@@ -47,8 +47,6 @@ def main():
         [
             MDFIND,
             "-0",
-            "-onlyin",
-            "/Applications/",
             MDFIND_EXPR,
         ],
         stdin=subprocess.DEVNULL,
@@ -61,9 +59,10 @@ def main():
     if len(paths) == 0:
         print(f"No Application matches {MDFIND_EXPR!r}", file=sys.stderr)
         return 63
-    if len(paths) > 1:
-        paths.sort(key=bundle_version_sort_key, reverse=True)
-    path = paths[0]
+    if len(paths) == 1:
+        path = paths[0]
+    else:
+        path = max(paths, key=bundle_version_sort_key)
 
     launch_result = subprocess.run(
         [
