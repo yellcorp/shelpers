@@ -1,5 +1,5 @@
 from config.bookmarks import bookmark
-from installer.binactions import PipenvPython, BundleOpener, Link
+from installer.binactions import HabitChanger, PipenvPython, BundleOpener, Link
 from utils.bookmark_util import name_func_to_fs
 from utils.macos.appbundle import BundlePath
 
@@ -58,4 +58,8 @@ launchers = [
     ),
 ]
 
-manifest = scripts + bookmarks + launchers
+habit_changers = [
+    HabitChanger("youtube-dl", "yt-dlp"),
+]
+
+manifest = scripts + bookmarks + launchers + habit_changers

@@ -1,7 +1,7 @@
 import os
 import shlex
 from pathlib import Path
-from typing import Iterator, Optional, NamedTuple, Union, Iterable, Any
+from typing import Any, Iterable, Iterator, NamedTuple, Optional, Union
 
 from utils.fs import to_path
 from utils.shell import ALL_ARGS_QUOTED, script_text
@@ -10,6 +10,12 @@ from .fsactions import FileAction, ScriptFile, Symlink
 _SH_SCRIPT_TEMPLATE = """\
 #!/bin/sh
 {command}
+"""
+
+_HABIT_CHANGER_TEMPLATE = """\
+#!/bin/sh
+echo {old_name}: Use {new_name} instead. >&2
+exit 1
 """
 
 
@@ -37,7 +43,7 @@ class PipenvPython(BinAction):
         self.name = name or to_path(self.py_name).stem
 
     def __repr__(self):
-        return ("{0.__class__.__name__}" "({1!r}," " {0.name!r})").format(
+        return "{0.__class__.__name__}({1!r}, {0.name!r})".format(
             self, [self.py_name] + self.extra_args
         )
 
@@ -64,7 +70,7 @@ class Opener(BinAction):
         self.name = name
 
     def __repr__(self):
-        return ("{0.__class__.__name__}" "({0.name!r})").format(self)
+        return "{0.__class__.__name__}({0.name!r})".format(self)
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         src = _SH_SCRIPT_TEMPLATE.format(command=script_text(self.get_command()))
@@ -87,7 +93,7 @@ class PathOpener(Opener):
         super().__init__(name)
 
     def __repr__(self):
-        return ("{0.__class__.__name__}" "({0.name!r}," " {0.path!r})").format(self)
+        return "{0.__class__.__name__}({0.name!r}, {0.path!r})".format(self)
 
     def get_command(self):
         return ["exec", "/usr/bin/open", "-a", os.fspath(self.path), ALL_ARGS_QUOTED]
@@ -104,9 +110,7 @@ class BundleOpener(Opener):
         self.bundle_id = bundle_id
 
     def __repr__(self):
-        return ("{0.__class__.__name__}" "({0.bundle_id!r}," " {0.name!r})").format(
-            self
-        )
+        return "{0.__class__.__name__}({0.bundle_id!r}, {0.name!r})".format(self)
 
     def get_command(self):
         return ["exec", "/usr/bin/open", "-b", self.bundle_id, ALL_ARGS_QUOTED]
@@ -118,9 +122,9 @@ class Link(BinAction):
         self.link_name = link_name
 
     def __repr__(self):
-        return (
-            "{0.__class__.__name__}" "({0.link_target!r}," " {0.link_name!r})"
-        ).format(self)
+        return ("{0.__class__.__name__}({0.link_target!r}, {0.link_name!r})").format(
+            self
+        )
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
         link_target = to_path(self.link_target)
@@ -142,3 +146,26 @@ class Link(BinAction):
             name = link_target.stem
 
         yield Symlink(context.bin / name, link_content)
+
+
+class HabitChanger(BinAction):
+    """
+    Creates a shell script that just echoes a reminder to use a
+    different command, and exits with error code 1. This is used when
+    switching from one command to another after long-term usage of the
+    former.
+    """
+
+    def __init__(self, old_name: str, new_name: str):
+        self.old_name = old_name
+        self.new_name = new_name
+
+    def __repr__(self):
+        return "{0.__class__.__name__}({0.old_name!r}, {0.new_name!r})".format(self)
+
+    def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
+        src = _HABIT_CHANGER_TEMPLATE.format(
+            old_name=shlex.quote(self.old_name),
+            new_name=shlex.quote(self.new_name),
+        )
+        yield ScriptFile(context.bin / self.old_name, src)
