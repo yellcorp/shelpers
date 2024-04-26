@@ -26,3 +26,11 @@ gox64()
 			;;
 	esac
 }
+
+pipenv()
+{
+	echo 'pipenv: Use poetry instead'
+	echo '  Or remove this reminder for the current shell session with'
+	echo '  `unset -f pipenv`'
+	return 1
+}
