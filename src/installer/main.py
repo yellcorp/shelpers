@@ -1,49 +1,75 @@
-import os
+import argparse
 import re
 import shlex
-import traceback
-from collections import OrderedDict
-from string import Template
-from typing import Iterable, Callable
-
+import subprocess
 import sys
+import traceback
+from pathlib import Path
+from typing import Iterable, Optional
 
-from utils.fs import to_path
+from config.manifest import manifest
 from utils.macos.appbundle import BundleError
-from utils.subproc import run_check_noinput, run_stdout
+from utils.shell import cli_filename
 from utils.text import u8open
-from utils.tristate import TriState
 from .binactions import BinAction, InstallContext
-from .console import (
-    make_install_requester,
-    yes_or_no,
-    STEP_DIVIDER,
-    OUTPUT_DIVIDER,
-    CORN,
-)
+from .console import CORN, OUTPUT_DIVIDER, STEP_DIVIDER
 from .rc import chatty_file_edit, determine_shell_rc_path
 from .receipts import ReceiptLog
-from .system import add_executable
+
+
+def get_arg_parser():
+    p = argparse.ArgumentParser(
+        description="""
+            Install shelpers.
+        """
+    )
+
+    p.add_argument(
+        "--force-venv",
+        action="store_true",
+        help="""
+            Create a new virtual environment for shelpers even if one
+            already exists.  The default is to only create one if it doesn't
+            exist.
+        """,
+    )
+
+    p.add_argument(
+        "--editrc",
+        action=argparse.BooleanOptionalAction,
+        help="""
+            Whether to automatically update shell profile scripts.
+            If not specified, the default is to ask.
+        """,
+    )
+
+    p.add_argument(
+        "--rcfile",
+        help="""
+            The shell script to edit when updating PATH vars and sourcing
+            function/alias scripts. The default is to try and automatically
+            determine an appropriate file based on the current shell in use.
+            Has no effect if --no-editrc is specified.
+        """,
+    )
+
+    return p
 
 
 class InstallJob:
     def __init__(
         self,
-        root,
-        python_exec: str,
-        check_pipenv_version: Callable[[bytes], bool],
-        check_pipx_version: Callable[[bytes], bool],
+        root: Path,
+        python_exec: Path,
         manifest: Iterable[BinAction],
-        allow_install_utilities: TriState,
-        allow_edit_shell_rc: TriState,
-        shell_rc_path=None,
+        force_venv: bool,
+        allow_edit_shell_rc: Optional[bool],
+        shell_rc_path: Optional[Path],
     ):
-        self.root = to_path(root)
+        self.root = root
         self.python_exec = python_exec
-        self.check_pipenv_version = check_pipenv_version
-        self.check_pipx_version = check_pipx_version
         self.manifest = list(manifest)
-        self.allow_install_utilities = allow_install_utilities
+        self.force_venv = force_venv
         self.allow_edit_shell_rc = allow_edit_shell_rc
         self.shell_rc_path = shell_rc_path
 
@@ -58,17 +84,16 @@ class InstallJob:
         return self.root / "profile"
 
     @property
-    def pipfile_path(self):
-        return self.root / "Pipfile"
+    def venv_path(self):
+        return self.root / "venv"
 
     @property
-    def pipfile_template_path(self):
-        return self.root / "Pipfile.template"
+    def venv_python_bin(self):
+        return self.venv_path / "bin" / "python"
 
     def run(self):
-        self.ensure_pipenv()
-        self.generate_pipfile()
-        self.install_deps()
+        self.create_venv()
+        self.install_requirements()
         self.clear_bins()
         self.generate_bins()
         self.edit_shell_rc()
@@ -77,120 +102,61 @@ class InstallJob:
         print(f"{CORN} Complete!")
         print("Remember to restart your shell to see PATH updates.")
 
-    def ensure_pipenv(self):
+    def create_venv(self):
         print(STEP_DIVIDER)
-        print("Checking pipenv")
 
-        def get_version():
-            return run_stdout(("pipenv", "--version"))
+        venv_exists = self.venv_path.is_dir()
 
-        add_executable(
-            "pipenv",
-            get_version,
-            self.check_pipenv_version,
-            make_install_requester(self.allow_install_utilities, "pipenv"),
-            self.install_pipenv,
+        if venv_exists and not self.force_venv:
+            print("Virtual environment already exists")
+            return
+
+        clear_args = ["--clear"] if venv_exists else []
+
+        print("Creating virtual environment")
+        subprocess.run(
+            [
+                cli_filename(self.python_exec),
+                "-m",
+                "venv",
+                cli_filename(self.venv_path),
+                "--prompt",
+                "shelpers-venv",
+                *clear_args,
+            ],
+            check=True,
         )
 
-    def install_pipenv(self):
-        self.ensure_pipx()
+    def install_requirements(self):
         print(STEP_DIVIDER)
-        print("Installing pipenv")
+        print("Installing dependencies")
         print(OUTPUT_DIVIDER)
 
-        run_check_noinput(("pipx", "install", "pipenv"))
+        pip = [
+            cli_filename(self.venv_python_bin),
+            "-m",
+            "pip",
+        ]
 
-    def ensure_pipx(self):
-        print(STEP_DIVIDER)
-        print("Checking pipx")
-
-        def get_version():
-            return run_stdout(("pipx", "--version"))
-
-        add_executable(
-            "pipx",
-            get_version,
-            self.check_pipx_version,
-            make_install_requester(self.allow_install_utilities, "pipx"),
-            self.install_pipx,
+        subprocess.run(
+            [
+                *pip,
+                "install",
+                "--upgrade",
+                "pip",
+            ],
+            check=True,
         )
 
-    def install_pipx(self):
-        print(STEP_DIVIDER)
-        print("Installing pipx")
-        print(OUTPUT_DIVIDER)
-
-        run_check_noinput(
-            (self.python_exec, "-m", "pip", "install", "--user", "pipx"),
+        subprocess.run(
+            [
+                *pip,
+                "install",
+                "-r",
+                cli_filename(self.root / "requirements.txt"),
+            ],
+            check=True,
         )
-
-        if self.allow_install_utilities == TriState.YES or (
-            self.allow_install_utilities == TriState.INDETERMINATE
-        ):
-            print(OUTPUT_DIVIDER)
-            if yes_or_no(
-                "pipx has been installed."
-                " Do you want it to check and potentially adjust the PATH"
-                " in your shell profile? "
-            ):
-                self.pipx_ensurepath()
-
-    def pipx_ensurepath(self):
-        print(STEP_DIVIDER)
-        print("Running pipx ensurepath")
-        print(OUTPUT_DIVIDER)
-
-        run_check_noinput((self.python_exec, "-m", "pipx", "ensurepath"))
-
-        # find out the new path
-        new_env_path = run_stdout((os.environ["SHELL"], "-i", "-c", 'printf "$PATH"'))
-        os.environb[b"PATH"] = new_env_path
-
-        print(OUTPUT_DIVIDER)
-        print(f'PATH is now {os.environ["PATH"]!r}')
-
-    def generate_pipfile(self):
-        python_version = get_python_version_for_pipfile()
-
-        print(STEP_DIVIDER)
-        print(f"Updating Pipfile for Python version {python_version}")
-
-        with u8open(self.pipfile_template_path, "r") as reader, u8open(
-            self.pipfile_path, "w"
-        ) as writer:
-            template = Template(reader.read())
-            writer.write(template.substitute({"python_version": python_version}))
-
-    def templatize_pipfile(self):
-        print(STEP_DIVIDER)
-        print(f"Templatizing Pipfile")
-
-        # The opposite of generate_pipfile - creates a template from the
-        # working copy of the Pipfile. Only used in development.
-        state = 0
-
-        with u8open(self.pipfile_path) as reader, u8open(
-            self.pipfile_template_path, "w"
-        ) as writer:
-            for line in reader:
-                if state == 0:
-                    if line.rstrip() == "[requires]":
-                        state = 1
-                elif state == 1:
-                    if re.match(r"python_version\s*=", line):
-                        writer.write('python_version = "${python_version}"\n')
-                        state = 2
-                        continue
-                    elif line.startswith("["):
-                        state = 2
-                writer.write(line)
-
-    def install_deps(self):
-        print(STEP_DIVIDER)
-        print("Running pipenv install")
-        print(OUTPUT_DIVIDER)
-
-        run_check_noinput(("pipenv", "install"), cwd=self.root)
 
     def clear_bins(self):
         print(STEP_DIVIDER)
@@ -222,13 +188,15 @@ class InstallJob:
 
         self.bin_path.mkdir(parents=True, exist_ok=True)
         context = InstallContext(
-            root=self.root, bin=self.bin_path, pipfile=self.pipfile_path
+            root=self.root,
+            bin=self.bin_path,
+            venv_python_bin=self.venv_python_bin,
         )
-        plan = OrderedDict()
+        plan = {}  # Ordered since 3.7
 
-        for item in self.manifest:
+        for manifest_item in self.manifest:
             try:
-                for p in item.get_plan(context):
+                for p in manifest_item.get_plan(context):
                     path = p.get_path()
                     k = str(path)
                     if k in plan:
@@ -237,7 +205,7 @@ class InstallJob:
                         )
                     plan[k] = p
             except BundleError:
-                print(f"Skipping {item!r} due to non-critical error")
+                print(f"Skipping {manifest_item!r} due to non-critical error")
                 traceback.print_exc()
                 continue
 
@@ -249,15 +217,18 @@ class InstallJob:
 
     def edit_shell_rc(self):
         print(STEP_DIVIDER)
-        if self.allow_edit_shell_rc == TriState.NO:
+        if self.allow_edit_shell_rc is False:
             print("Skipping profile edits because they have been disallowed")
             return
 
         rc_path = (
             determine_shell_rc_path()
             if self.shell_rc_path is None
-            else to_path(self.shell_rc_path)
+            else self.shell_rc_path
         )
+        if rc_path is None:
+            return
+
         rc_backup_path = rc_path.parent / f"{rc_path.name}.shelpers-backup"
 
         path_comment = "# Adds shelpers to PATH"
@@ -306,9 +277,30 @@ class InstallJob:
             rc_path,
             rc_backup_path,
             "".join(rc_lines),
-            self.allow_edit_shell_rc == TriState.INDETERMINATE,
+            self.allow_edit_shell_rc is None,
         )
 
 
-def get_python_version_for_pipfile():
-    return f"{sys.version_info.major}.{sys.version_info.minor}"
+def main():
+    this_file = Path(__file__).absolute().resolve()
+    installer_module = this_file.parent
+    src_dir = installer_module.parent
+    repo_root = src_dir.parent
+    assert repo_root.is_dir()
+
+    python_path = Path(sys.executable)
+    assert python_path.is_file()
+
+    args = get_arg_parser().parse_args()
+
+    rcfile = Path(args.rcfile) if args.rcfile else None
+    job = InstallJob(
+        repo_root,
+        python_path,
+        manifest,
+        args.force_venv,
+        args.editrc,
+        rcfile,
+    )
+
+    return job.run()

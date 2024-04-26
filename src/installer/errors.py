@@ -1,2 +1,0 @@
-class InstallError(Exception):
-    pass

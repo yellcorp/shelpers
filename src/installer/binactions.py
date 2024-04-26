@@ -1,9 +1,9 @@
 import os
 import shlex
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Iterator, NamedTuple, Optional, Union
+from typing import Iterator, Optional
 
-from utils.fs import to_path
 from utils.shell import ALL_ARGS_QUOTED, script_text
 from .fsactions import FileAction, ScriptFile, Symlink
 
@@ -19,10 +19,19 @@ exit 1
 """
 
 
-class InstallContext(NamedTuple):
+def _fsstr(value) -> str:
+    return str(os.fspath(value) if isinstance(value, os.PathLike) else value)
+
+
+def _fsstrlist(values) -> list[str]:
+    return [] if values is None else [_fsstr(v) for v in values]
+
+
+@dataclass
+class InstallContext:
     root: Path
     bin: Path
-    pipfile: Path
+    venv_python_bin: Path
 
 
 class BinAction:
@@ -30,39 +39,26 @@ class BinAction:
         raise NotImplementedError()
 
 
-class PipenvPython(BinAction):
-    def __init__(self, py_name: Union[str, Iterable[Any]], name: Optional[str] = None):
-        if isinstance(py_name, str):
-            self.py_name = py_name
-            self.extra_args = []
-        else:
-            i = iter(py_name)
-            self.py_name = next(i)
-            self.extra_args = list(i)
-
-        self.name = name or to_path(self.py_name).stem
+class PythonScript(BinAction):
+    def __init__(self, script, args=None, bin_name: Optional[str] = None):
+        self.script = Path(script)
+        self.args = _fsstrlist(args)
+        self.bin_name = self.script.stem if bin_name is None else bin_name
 
     def __repr__(self):
-        return "{0.__class__.__name__}({1!r}, {0.name!r})".format(
-            self, [self.py_name] + self.extra_args
+        return (
+            "{0.__class__.__name__}({0.script!r}, {0.args!r}, {0.bin_name!r})".format(
+                self
+            )
         )
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
-        env = dict(
-            PIPENV_PIPFILE=context.pipfile.absolute(),
-            PIPENV_IGNORE_VIRTUALENVS=1,
-            PIPENV_VERBOSITY=-1,
-        )
-        env_prefix = " ".join(f"{k}={shlex.quote(str(v))}" for k, v in env.items())
-
-        command = ["pipenv", "run", "python", context.root / self.py_name]
-        command.extend(self.extra_args)
-        command.append(ALL_ARGS_QUOTED)
-
-        text = f"{env_prefix} {script_text(command)}"
-
-        src = _SH_SCRIPT_TEMPLATE.format(command=text)
-        yield ScriptFile(context.bin / self.name, src)
+        script = self.script
+        if not script.is_absolute():
+            script = context.root / script
+        command = ["exec", context.venv_python_bin, script, *self.args, ALL_ARGS_QUOTED]
+        src = _SH_SCRIPT_TEMPLATE.format(command=script_text(command))
+        yield ScriptFile(context.bin / self.bin_name, src)
 
 
 class Opener(BinAction):
@@ -87,9 +83,9 @@ class PathOpener(Opener):
     """
 
     def __init__(self, path, name: Optional[str] = None):
-        self.path = path
+        self.path = Path(path)
         if not name:
-            name = to_path(path).stem
+            name = self.path.stem
         super().__init__(name)
 
     def __repr__(self):
@@ -117,35 +113,29 @@ class BundleOpener(Opener):
 
 
 class Link(BinAction):
-    def __init__(self, link_target, link_name=None):
-        self.link_target = link_target
-        self.link_name = link_name
+    def __init__(self, link_target, link_name: Optional[str] = None):
+        self.link_target = Path(link_target)
+        self.link_name = self.link_target.stem if link_name is None else link_name
 
     def __repr__(self):
-        return ("{0.__class__.__name__}({0.link_target!r}, {0.link_name!r})").format(
-            self
-        )
+        return "{0.__class__.__name__}({0.link_target!r}, {0.link_name!r})".format(self)
 
     def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
-        link_target = to_path(self.link_target)
+        link_path = context.bin / self.link_name
+        link_base = link_path.parent
+
+        link_target = self.link_target
         if not link_target.is_absolute():
             link_target = context.root / link_target
         link_target = link_target.resolve()
 
-        # Path.is_relative_to added in py3.9
-        try:
-            _ = link_target.relative_to(context.root)
-            # drop back to os.path api, because that inserts updirs.
-            # Path.relative_to raises an error instead
-            link_content = os.path.relpath(link_target, context.bin)
-        except ValueError:
-            link_content = str(link_target)
+        # Make symlinks relative if they point within this repo
+        if link_target.is_relative_to(context.root):
+            link_content = os.path.relpath(link_target, link_base)
+        else:
+            link_content = os.fspath(link_target)
 
-        name = self.link_name
-        if not name:
-            name = link_target.stem
-
-        yield Symlink(context.bin / name, link_content)
+        yield Symlink(link_path, link_content)
 
 
 class HabitChanger(BinAction):

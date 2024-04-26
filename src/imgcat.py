@@ -67,7 +67,7 @@ def get_arg_parser():
     return p
 
 
-SCALER = Scaler(PIL.Image.BILINEAR)
+SCALER = Scaler(PIL.Image.Resampling.BILINEAR)
 
 IMAGE_TRANSFER_FORMAT_KWARGS = dict(
     format="jpeg",

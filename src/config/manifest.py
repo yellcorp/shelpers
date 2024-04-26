@@ -1,5 +1,5 @@
 from config.bookmarks import bookmark
-from installer.binactions import HabitChanger, PipenvPython, BundleOpener, Link
+from installer.binactions import HabitChanger, PythonScript, BundleOpener, Link
 from utils.bookmark_util import name_func_to_fs
 from utils.macos.appbundle import BundlePath
 
@@ -17,16 +17,16 @@ scripts = [
     Link("src/git-zip.sh", "git-zip"),
     Link("src/git-zip.sh", "git-tbz"),
     Link("src/git-zip.sh", "git-tgz"),
-    PipenvPython("src/bridge.py"),
-    PipenvPython("src/imgcat.py"),
-    PipenvPython("src/jpegopt.py"),
-    PipenvPython("src/pipenv-unused.py"),
-    PipenvPython("src/trash.py"),
-    PipenvPython("src/unzipdir.py"),
+    PythonScript("src/bridge.py"),
+    PythonScript("src/imgcat.py"),
+    PythonScript("src/jpegopt.py"),
+    PythonScript("src/pipenv-unused.py"),
+    PythonScript("src/trash.py"),
+    PythonScript("src/unzipdir.py"),
 ]
 
 bookmarks = [
-    PipenvPython(("src/open_bookmark.py", name), name_func_to_fs(name))
+    PythonScript("src/open_bookmark.py", [name], name_func_to_fs(name))
     for name in bookmark.keys()
 ]
 

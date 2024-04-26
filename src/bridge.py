@@ -2,7 +2,7 @@
 Adobe Bridge includes its version number in its bundle identifier, so if I
 want this to work across multiple machines with possibly different versions
 installed, or if I just don't want to reupdate the launcher every major
-version bump, it's a little more fussy that just using BundleOpener to drop
+version bump, it's a little more fussy than just using BundleOpener to drop
 a shell script that calls open -b. I blame myself for being someone who
 actually sometimes uses Bridge.
 """

@@ -1,10 +1,9 @@
-import functools
 import os
 import pathlib
 import re
 import subprocess
 from functools import lru_cache
-from typing import Optional, Iterable, List
+from typing import List, Optional
 
 MDFIND = "/usr/bin/mdfind"
 
@@ -39,14 +38,12 @@ def find_app_by_bundle_id(bundle_id: str) -> Optional[str]:
 
 
 class BundlePath:
-    def __init__(self, bundle_id: str, path: Optional[Iterable[any]] = None):
+    def __init__(self, bundle_id: str, rel_path=None):
         self.bundle_id = bundle_id
-        self.rel_path = list(path) if path else []
+        self.rel_path = pathlib.Path(os.curdir if rel_path is None else rel_path)
 
     def __truediv__(self, other):
-        d = BundlePath(self.bundle_id, self.rel_path)
-        d.rel_path.append(other)
-        return d
+        return BundlePath(self.bundle_id, self.rel_path / other)
 
     def __repr__(self):
         return (
@@ -67,7 +64,4 @@ class BundlePath:
             raise BundleError(
                 f"Application bundle not found (bundle_id={self.bundle_id!r})"
             )
-        base = pathlib.Path(app_path)
-        if self.rel_path:
-            return functools.reduce(lambda path, seg: path / seg, self.rel_path, base)
-        return base
+        return pathlib.Path(app_path) / self.rel_path

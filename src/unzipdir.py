@@ -7,8 +7,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import Iterable, Optional
 
-from utils.fs import to_path
-
 
 def get_arg_parser():
     p = ArgumentParser(
@@ -111,18 +109,18 @@ class Runner:
             self.extract(f)
 
     def extract(self, archive_file: os.PathLike):
-        archive_path = to_path(archive_file)
-        dir = to_path(self.dir_for_archive_file(archive_path))
+        archive_path = Path(archive_file)
+        dir = self.dir_for_archive_file(archive_path)
         if not self.should_extract_to(dir):
             self.warn(f"Skipping: {str(archive_path)!r}")
             return
         dir.mkdir(parents=True, exist_ok=True)
         self._do_extract(archive_path, dir)
 
-    def dir_for_archive_file(self, file: Path):
+    def dir_for_archive_file(self, file: Path) -> Path:
         return file.parent / f"{file.name}.d"
 
-    def should_extract_to(self, dir: Path):
+    def should_extract_to(self, dir: Path) -> bool:
         if dir.exists():
             self.warn(f"Exists: {str(dir)!r}")
             return False

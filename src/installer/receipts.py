@@ -1,13 +1,13 @@
 import ast
 import os
+from pathlib import Path
 
-from utils.fs import to_path
 from utils.text import u8open
 
 
 class ReceiptLog:
     def __init__(self, path):
-        self.path = to_path(path)
+        self.path = Path(path)
 
     def clear(self):
         self.path.unlink(missing_ok=True)
