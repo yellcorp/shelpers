@@ -1,6 +1,8 @@
 import argparse
+import os.path
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import traceback
@@ -12,7 +14,7 @@ from utils.macos.appbundle import BundleError
 from utils.shell import cli_filename
 from utils.text import u8open
 from .binactions import BinAction, InstallContext
-from .console import CORN, OUTPUT_DIVIDER, STEP_DIVIDER
+from .console import CORN, OUTPUT_DIVIDER, POPCORN, STEP_DIVIDER
 from .rc import chatty_file_edit, determine_shell_rc_path
 from .receipts import ReceiptLog
 
@@ -54,6 +56,38 @@ def get_arg_parser():
     )
 
     return p
+
+
+def search_for_old_pipenv(owner_project: Path) -> Optional[Path]:
+    if shutil.which("pipenv") is not None:
+        # easy way
+        try:
+            result = subprocess.run(
+                ["pipenv", "--venv"],
+                cwd=owner_project,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            venv_path = Path(result.stdout.strip())
+            if venv_path.is_dir():
+                return venv_path
+        except (OSError, subprocess.CalledProcessError):
+            pass
+
+    # hard way
+    venvs_parent = Path.home() / ".local" / "share" / "virtualenvs"
+    if venvs_parent.is_dir():
+        for project_file in venvs_parent.glob(os.path.join("*", ".project")):
+            try:
+                project_dir_str = project_file.read_text().rstrip()
+                project_dir = Path(project_dir_str)
+                if project_dir.samefile(owner_project):
+                    return project_file.parent
+            except OSError:
+                pass
+
+    return None
 
 
 class InstallJob:
@@ -101,6 +135,19 @@ class InstallJob:
         print(STEP_DIVIDER)
         print(f"{CORN} Complete!")
         print("Remember to restart your shell to see PATH updates.")
+
+        old_pipenv_venv_path = search_for_old_pipenv(self.root)
+        if old_pipenv_venv_path is not None:
+            print(f"\n{POPCORN} An old pipenv environment was found for this project:")
+            print(f"     {old_pipenv_venv_path}")
+            print("   Pipenv is no longer used, so this environment can be removed.")
+            print("\n   Try either:")
+            print(f"     $ cd {shlex.quote(str(self.root))}")
+            print("     $ pipenv --rm")
+            print("\n   Or:")
+            print(f"     $ rm -r {shlex.quote(str(old_pipenv_venv_path))}")
+
+        return None
 
     def create_venv(self):
         print(STEP_DIVIDER)
