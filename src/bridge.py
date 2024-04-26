@@ -7,10 +7,10 @@ a shell script that calls open -b. I blame myself for being someone who
 actually sometimes uses Bridge.
 """
 
+import os.path
 import plistlib
 import subprocess
 import sys
-import os.path
 
 from utils.macos.appbundle import MDFIND
 

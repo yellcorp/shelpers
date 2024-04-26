@@ -7,6 +7,7 @@ from typing import Optional
 from utils.shell import cli_filename, determine_shell, get_shell_info
 from utils.subproc import make_called_process_error
 from utils.text import text_is_pretty_much_same, u8read, u8write
+
 from .console import OUTPUT_DIVIDER, yes_or_no
 
 

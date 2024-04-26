@@ -13,6 +13,7 @@ from config.manifest import manifest
 from utils.macos.appbundle import BundleError
 from utils.shell import cli_filename
 from utils.text import u8open
+
 from .binactions import BinAction, InstallContext
 from .console import CORN, OUTPUT_DIVIDER, POPCORN, STEP_DIVIDER
 from .rc import chatty_file_edit, determine_shell_rc_path

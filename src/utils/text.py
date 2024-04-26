@@ -1,7 +1,6 @@
 import functools
 from typing import List
 
-
 u8open = functools.partial(open, encoding="utf-8")
 
 

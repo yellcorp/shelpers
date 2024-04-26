@@ -7,6 +7,7 @@ from typing import Iterator, Optional
 
 from utils.macos.appbundle import BundleError, find_app_by_bundle_id
 from utils.shell import ALL_ARGS_QUOTED, script_text
+
 from .fsactions import FileAction, ScriptFile, Symlink
 
 _SH_SCRIPT_TEMPLATE = """\

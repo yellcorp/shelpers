@@ -1,4 +1,4 @@
-from utils.bookmark_util import URL, FunctionDict, join_space
+from utils.bookmark_util import FunctionDict, join_space, URL
 
 bookmark = FunctionDict()
 

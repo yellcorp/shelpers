@@ -1,10 +1,10 @@
 from config.bookmarks import bookmark
 from installer.binactions import (
+    BundleOpener,
     HabitChanger,
     IfBundle,
-    PythonScript,
-    BundleOpener,
     Link,
+    PythonScript,
 )
 from utils.bookmark_util import name_func_to_fs
 

@@ -6,11 +6,11 @@ from functools import partial
 import PIL.Image
 
 from utils.image import (
-    Scaler,
     composite_checkerboard,
     deref_palette,
     image_has_transparency,
     is_image_filename,
+    Scaler,
 )
 from utils.iterm import iterm_encode_image
 

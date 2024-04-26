@@ -2,7 +2,7 @@ import os
 import os.path
 from collections import OrderedDict
 from functools import wraps
-from urllib.parse import urlsplit, parse_qsl, urlunsplit, urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 def name_func_to_fs(name: str):
