@@ -1,7 +1,12 @@
 from config.bookmarks import bookmark
-from installer.binactions import HabitChanger, PythonScript, BundleOpener, Link
+from installer.binactions import (
+    HabitChanger,
+    IfBundle,
+    PythonScript,
+    BundleOpener,
+    Link,
+)
 from utils.bookmark_util import name_func_to_fs
-from utils.macos.appbundle import BundlePath
 
 scripts = [
     Link("src/chmod-default.sh"),
@@ -41,20 +46,24 @@ launchers = [
     #
     # launchers included with apps
     #
-    Link(BundlePath("com.torusknot.SourceTreeNotMAS") / "Contents/Resources/stree"),
+    IfBundle(
+        "com.torusknot.SourceTreeNotMAS",
+        lambda sourcetree: Link(sourcetree / "Contents/Resources/stree"),
+    ),
     # Both names link to {bundle}/.../bcomp, so I presume it must modify its
     # behavior based on argv[0]. 'bcomp' waits for the tab to close / app to
     # exit, 'bcompare' exits immediately
-    Link(
-        BundlePath("com.ScooterSoftware.BeyondCompare") / "Contents/MacOS/bcomp",
-        "bcompare",
+    IfBundle(
+        "com.ScooterSoftware.BeyondCompare",
+        lambda bc: Link(bc / "Contents/MacOS/bcomp", "bcomp"),
     ),
-    Link(
-        BundlePath("com.ScooterSoftware.BeyondCompare") / "Contents/MacOS/bcomp",
-        "bcomp",
+    IfBundle(
+        "com.ScooterSoftware.BeyondCompare",
+        lambda bc: Link(bc / "Contents/MacOS/bcomp", "bcompare"),
     ),
-    Link(
-        BundlePath("com.microsoft.VSCode") / "Contents/Resources/app/bin/code", "vscode"
+    IfBundle(
+        "com.microsoft.VSCode",
+        lambda vscode: Link(vscode / "Contents/Resources/app/bin/code", "vscode"),
     ),
 ]
 

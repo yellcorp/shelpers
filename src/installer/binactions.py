@@ -1,9 +1,11 @@
 import os
 import shlex
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Optional
 
+from utils.macos.appbundle import BundleError, find_app_by_bundle_id
 from utils.shell import ALL_ARGS_QUOTED, script_text
 from .fsactions import FileAction, ScriptFile, Symlink
 
@@ -110,6 +112,42 @@ class BundleOpener(Opener):
 
     def get_command(self):
         return ["exec", "/usr/bin/open", "-b", self.bundle_id, ALL_ARGS_QUOTED]
+
+
+class IfBundle(BinAction):
+    """
+    A BinAction that depends on the existence of an application bundle.
+
+    Uses `mdfind` to search for the specified bundle identifier, and if
+    found, passes the .app path to the factory function, which should use it
+    to create another BinAction. If the bundle is not found, get_plan yields
+    nothing.
+    """
+
+    # This is a bit of a cheesy hack to remedy something I thought was
+    # clever at the time, but led to overeager Exceptions when importing
+    # config.manifest and the requested bundle was not installed. Not all
+    # apps are installed on all computers!
+
+    def __init__(self, bundle_id: str, factory: Callable[[Path], BinAction]):
+        self.bundle_id = bundle_id
+        self.factory = factory
+
+    def __repr__(self):
+        return "{0.__class__.__name__}({0.bundle_id!r}, {0.action!r})".format(self)
+
+    def get_plan(self, context: InstallContext) -> Iterator[FileAction]:
+        try:
+            app_dir_str = find_app_by_bundle_id(self.bundle_id)
+        except BundleError:
+            app_dir_str = None
+
+        if app_dir_str is not None:
+            app_dir = Path(app_dir_str)
+            yield from self.factory(app_dir).get_plan(context)
+
+    def bundle_exists(self, context: InstallContext) -> bool:
+        raise NotImplementedError()
 
 
 class Link(BinAction):
