@@ -6,7 +6,12 @@ from functools import lru_cache
 
 @lru_cache(maxsize=1)
 def is_tmux():
-    return os.environ.get("TERM", "").startswith("screen")
+    if os.environ.get("TERM_PROGRAM", "") == "tmux":
+        return True
+    term = os.environ.get("TERM", "")
+    if term in ("tmux", "screen") or term.startswith(("tmux-", "screen-")):
+        return True
+    return False
 
 
 @lru_cache(maxsize=1)
@@ -31,7 +36,15 @@ def iterm_format_dict(d):
     return ";".join(f"{k}={v}" for k, v in d.items())
 
 
-def iterm_encode_image(image, pil_save_args, name=None):
+# Must be less than 1048576 (2**20). Since v3.5.0, iTerm will abort
+# parsing of any sequences longer than 1048576 bytes.
+DEFAULT_MULTIPART_CHUNK_SIZE = 0xEC000
+
+
+def iterm_encode_image(image, pil_save_args, name=None, multipart_chunk_size=None):
+    if multipart_chunk_size is None:
+        multipart_chunk_size = DEFAULT_MULTIPART_CHUNK_SIZE
+
     transfer_file = io.BytesIO()
     image.save(transfer_file, **pil_save_args)
 
@@ -48,9 +61,17 @@ def iterm_encode_image(image, pil_save_args, name=None):
     if name is not None:
         kwargs["name"] = base64_text(name.encode("utf-8"))
 
-    return osc(
-        "1337;File={kwargs}:{encoded_bytes}".format(
-            kwargs=iterm_format_dict(kwargs),
-            encoded_bytes=base64_text(transfer_bytes),
-        )
-    )
+    kwargs_str = iterm_format_dict(kwargs)
+    encoded_content = base64_text(transfer_bytes)
+
+    if multipart_chunk_size > 0:
+        # This multipart protocol is not documented at the time of writing. A
+        # reference implementation is here:
+        # https://raw.githubusercontent.com/gnachman/iTerm2-shell-integration/main/utilities/imgcat
+        yield osc(f"1337;MultipartFile={kwargs_str}")
+        for offset in range(0, len(encoded_content), multipart_chunk_size):
+            chunk = encoded_content[offset : offset + multipart_chunk_size]
+            yield osc(f"1337;FilePart={chunk}")
+        yield osc("1337;FileEnd")
+    else:
+        yield osc(f"1337;File={kwargs_str}:{encoded_content}")

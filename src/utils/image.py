@@ -9,7 +9,7 @@ def scaler_identity(image):
 
 
 class Scaler:
-    def __init__(self, filter=PIL.Image.BILINEAR):
+    def __init__(self, filter=PIL.Image.Resampling.BILINEAR):
         self.filter = filter
 
     def image_scale_by_factor(self, image, factor):
@@ -149,7 +149,7 @@ def generate_checkerboard(dimensions, checker_size, color1, color2, mode="P"):
     pix_image.putpalette(palette)
 
     large_dims = [axis * checker_size for axis in checker_dims]
-    oversized_image = pix_image.resize(large_dims, PIL.Image.NEAREST)
+    oversized_image = pix_image.resize(large_dims, PIL.Image.Resampling.NEAREST)
     del pix_image
 
     # a small touch: center the crop that we take from the oversized

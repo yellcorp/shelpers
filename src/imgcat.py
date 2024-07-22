@@ -20,6 +20,8 @@ CHECKER_COLORS = (
     (143, 143, 143),
 )
 
+SCALER = Scaler(PIL.Image.Resampling.BILINEAR)
+
 
 def get_arg_parser():
     p = ArgumentParser(
@@ -64,10 +66,19 @@ def get_arg_parser():
         """,
     )
 
+    p.add_argument(
+        "--no-multipart",
+        "-M",
+        action="store_false",
+        dest="multipart",
+        help="""\
+            Use the older image protocol for iTerm versions prior to
+            3.5.0.
+        """,
+    )
+
     return p
 
-
-SCALER = Scaler(PIL.Image.Resampling.BILINEAR)
 
 IMAGE_TRANSFER_FORMAT_KWARGS = dict(
     format="jpeg",
@@ -110,9 +121,10 @@ def recursive_file_iter(paths, onerror):
 
 
 class App:
-    def __init__(self, resize_func, alpha: bool, onerror):
+    def __init__(self, resize_func, alpha: bool, multipart: bool, onerror):
         self.resize_func = resize_func
         self.alpha = alpha
+        self.multipart = multipart
         self.onerror = onerror
 
     def run(self, paths):
@@ -134,7 +146,14 @@ class App:
             )
 
         print(path)
-        print(iterm_encode_image(image, IMAGE_TRANSFER_FORMAT_KWARGS, name=path))
+        for seq in iterm_encode_image(
+            image,
+            IMAGE_TRANSFER_FORMAT_KWARGS,
+            name=path,
+            multipart_chunk_size=None if self.multipart else 0,
+        ):
+            print(seq, end="", flush=True)
+        print()
 
 
 def main():
@@ -149,6 +168,7 @@ def main():
     app = App(
         resize_func=config.size,
         alpha=config.alpha,
+        multipart=config.multipart,
         onerror=reporter,
     )
 
