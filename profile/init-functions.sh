@@ -34,3 +34,8 @@ pipenv()
 	echo '  `unset -f pipenv`'
 	return 1
 }
+
+poetry-activate()
+{
+  eval "$(poetry env activate)"
+}
