@@ -6,8 +6,9 @@ import shutil
 import subprocess
 import sys
 import traceback
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 from config.manifest import manifest
 from utils.macos.appbundle import BundleError

@@ -1,9 +1,9 @@
 import os
 import shlex
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Optional
 
 from utils.macos.appbundle import BundleError, find_app_by_bundle_id
 from utils.shell import ALL_ARGS_QUOTED, script_text

@@ -1,5 +1,4 @@
 import functools
-from typing import List
 
 u8open = functools.partial(open, encoding="utf-8")
 
@@ -14,7 +13,7 @@ def u8write(path, text):
         return writer.write(str(text))
 
 
-def significant_lines(text: str) -> List[str]:
+def significant_lines(text: str) -> list[str]:
     return [line for line in text.splitlines(keepends=False) if not line.isspace()]
 
 

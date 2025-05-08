@@ -4,8 +4,9 @@ import re
 import subprocess
 import sys
 from argparse import ArgumentParser
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 
 def get_arg_parser():
