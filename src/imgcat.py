@@ -7,18 +7,14 @@ import PIL.Image
 
 from utils.image import (
     composite_checkerboard,
+    DEFAULT_CHECKER_COLORS,
+    DEFAULT_CHECKER_SIZE,
     deref_palette,
     image_has_transparency,
     is_image_filename,
     Scaler,
 )
 from utils.iterm import iterm_encode_image
-
-CHECKER_SIZE = 16
-CHECKER_COLORS = (
-    (111, 111, 111),
-    (143, 143, 143),
-)
 
 SCALER = Scaler(PIL.Image.Resampling.BILINEAR)
 
@@ -142,7 +138,10 @@ class App:
 
         if image_has_transparency(image) and not self.alpha:
             image = composite_checkerboard(
-                image, CHECKER_SIZE, CHECKER_COLORS[0], CHECKER_COLORS[1]
+                image,
+                DEFAULT_CHECKER_SIZE,
+                DEFAULT_CHECKER_COLORS[0],
+                DEFAULT_CHECKER_COLORS[1],
             )
 
         print(path)
