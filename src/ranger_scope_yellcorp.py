@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import dataclass
 from enum import IntEnum
@@ -33,7 +34,7 @@ class ExitCode(IntEnum):
 
 
 @dataclass
-class ScriptArgs:
+class RangerScopeArgs:
     argv0: Path
     file_path: Path
     n_cols: int
@@ -42,7 +43,7 @@ class ScriptArgs:
     image_preview_enabled: bool
 
     @classmethod
-    def from_argv(cls, argv: list[str]) -> ScriptArgs:
+    def from_argv(cls, argv: list[str]) -> RangerScopeArgs:
         argv0, file_path, n_cols, n_rows, image_cache_path, image_preview_enabled = argv
 
         return cls(
@@ -55,34 +56,47 @@ class ScriptArgs:
         )
 
 
-def render_image_preview(source_path: Path, cache_path: Path) -> bool:
-    try:
-        image = PIL.Image.open(source_path)
-        image.apply_transparency()
-        image.thumbnail(PREVIEW_MAX_SIZE)
+def render_image_preview(source_path: Path, cache_path: Path) -> None:
+    image = PIL.Image.open(source_path)
+    image.apply_transparency()
+    image.thumbnail(PREVIEW_MAX_SIZE)
 
-        if image_has_transparency(image):
-            image = composite_checkerboard(
-                image.convert("RGBA"),
-                DEFAULT_CHECKER_SIZE,
-                DEFAULT_CHECKER_COLORS[0],
-                DEFAULT_CHECKER_COLORS[1],
-            )
+    if image_has_transparency(image):
+        image = composite_checkerboard(
+            image.convert("RGBA"),
+            DEFAULT_CHECKER_SIZE,
+            DEFAULT_CHECKER_COLORS[0],
+            DEFAULT_CHECKER_COLORS[1],
+        )
 
-        image = image.convert("RGB")
-        image.save(cache_path, format="JPEG", quality=PREVIEW_JPEG_QUALITY)
-        return True
-    except Exception:
-        return False
+    image = image.convert("RGB")
+    image.save(cache_path, format="JPEG", quality=PREVIEW_JPEG_QUALITY)
 
 
 def main():
-    args = ScriptArgs.from_argv(sys.argv)
-    if args.image_preview_enabled and render_image_preview(
-        args.file_path,
-        args.image_cache_path,
-    ):
-        return ExitCode.PREVIEW_AS_IMAGE_AT_CACHE_PATH
+    is_test = os.getenv("YELLCORP_TEST") == "1"
+    if is_test:
+        argv0, in_path, out_path = sys.argv
+        args = RangerScopeArgs(
+            argv0=Path(argv0),
+            file_path=Path(in_path),
+            n_cols=80,
+            n_rows=24,
+            image_cache_path=Path(out_path),
+            image_preview_enabled=True,
+        )
+    else:
+        args = RangerScopeArgs.from_argv(sys.argv)
+
+    if args.image_preview_enabled:
+        try:
+            render_image_preview(args.file_path, args.image_cache_path)
+            return ExitCode.PREVIEW_AS_IMAGE_AT_CACHE_PATH
+        except Exception:
+            if is_test:
+                raise
+            else:
+                pass
     return ExitCode.DECLINE
 
 

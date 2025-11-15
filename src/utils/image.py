@@ -141,9 +141,6 @@ def generate_checkerboard(
     if checker_size <= 0:
         raise ValueError("Invalid checker_size")
 
-    if mode not in ("P", "RGB"):
-        raise ValueError("Mode must be one of 'P', 'RGB'")
-
     # ceil-divide dimensions by checker_size to get the canvas size
     # at which one checker = one pixel
     countx, county = ((axis + checker_size - 1) // checker_size for axis in dimensions)
