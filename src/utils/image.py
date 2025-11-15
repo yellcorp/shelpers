@@ -1,7 +1,8 @@
 import os
 import re
+from collections.abc import Callable
 
-import PIL.Image
+from PIL.Image import alpha_composite, frombytes, Image, Resampling
 
 ColorRGB = tuple[int, int, int]
 
@@ -17,45 +18,47 @@ def scaler_identity(image):
     return image
 
 
+ImageFunction = Callable[[Image], Image]
+
+
 class Scaler:
-    def __init__(self, filter=PIL.Image.Resampling.BILINEAR):
+    def __init__(self, filter: Resampling = Resampling.BILINEAR):
         self.filter = filter
 
-    def image_scale_by_factor(self, image, factor):
+    def image_scale_by_factor(self, image: Image, factor: float) -> Image:
         if factor == 1:
             return image
 
-        return image.resize(
-            [int(axis * factor + 0.5) for axis in image.size], self.filter
-        )
+        w, h = [int(axis * factor + 0.5) for axis in image.size]
+        return image.resize((w, h), self.filter)
 
-    def image_scale_down_by_factor(self, image, factor):
+    def image_scale_down_by_factor(self, image: Image, factor: float) -> Image:
         if factor >= 1:
             return image
         return self.image_scale_by_factor(image, factor)
 
-    def scaler_fit(self, width, height):
-        def scale(image):
+    def scaler_fit(self, width: float, height: float) -> ImageFunction:
+        def scale(image: Image) -> Image:
             owidth, oheight = image.size
             factor = min(width / owidth, height / oheight)
             return self.image_scale_down_by_factor(image, factor)
 
         return scale
 
-    def scaler_width(self, width):
-        def scale(image):
+    def scaler_width(self, width: float) -> ImageFunction:
+        def scale(image: Image) -> Image:
             owidth, _height = image.size
             return self.image_scale_down_by_factor(image, width / owidth)
 
         return scale
 
-    def scaler_factor(self, factor):
-        def scale(image):
+    def scaler_factor(self, factor: float) -> ImageFunction:
+        def scale(image: Image) -> Image:
             return self.image_scale_by_factor(image, factor)
 
         return scale
 
-    def parse(self, scale_spec: str):
+    def parse(self, scale_spec: str) -> ImageFunction:
         if scale_spec.endswith("%"):
             factor = float(scale_spec[:-1]) / 100
             if factor == 1:
@@ -116,7 +119,7 @@ SUPPORTED_EXTS = frozenset(
 )
 
 
-def is_image_filename(name):
+def is_image_filename(name: str) -> bool:
     name = name.lower()
     if name == ".icns":
         return True
@@ -131,7 +134,7 @@ def generate_checkerboard(
     color1: ColorRGB,
     color2: ColorRGB,
     mode: str = "P",
-) -> PIL.Image.Image:
+) -> Image:
     if any(axis <= 0 for axis in dimensions):
         raise ValueError("Invalid dimensions")
 
@@ -150,12 +153,12 @@ def generate_checkerboard(
     countx |= 1
 
     # how many checkers?
-    checker_count = countx, county
+    checker_count = countx * county
     # how many pairs? ceil-divide by 2
     pair_count = (checker_count + 1) // 2
 
     checker_raster = b"\x00\x01" * pair_count
-    pix_image = PIL.Image.frombytes("P", (countx, county), checker_raster)
+    pix_image = frombytes("P", (countx, county), checker_raster)
 
     palette = bytearray(768)
     palette[0:3] = color1
@@ -164,7 +167,7 @@ def generate_checkerboard(
 
     cpix_w, cpix_h = [axis * checker_size for axis in (countx, county)]
     ceil_pixel_size = cpix_w, cpix_h
-    oversized_image = pix_image.resize(ceil_pixel_size, PIL.Image.Resampling.NEAREST)
+    oversized_image = pix_image.resize(ceil_pixel_size, Resampling.NEAREST)
     del pix_image
 
     # a small touch: center the crop that we take from the oversized
@@ -185,21 +188,28 @@ def generate_checkerboard(
 
 
 def composite_checkerboard(
-    rgba_image: PIL.Image.Image, checker_size: int, color1: ColorRGB, color2: ColorRGB
-) -> PIL.Image.Image:
+    rgba_image: Image,
+    checker_size: int,
+    color1: ColorRGB,
+    color2: ColorRGB,
+) -> Image:
     checkerboard = generate_checkerboard(
-        rgba_image.size, checker_size, color1, color2, "RGBA"
+        rgba_image.size,
+        checker_size,
+        color1,
+        color2,
+        "RGBA",
     )
-    return PIL.Image.alpha_composite(checkerboard, rgba_image).convert("RGB")
+    return alpha_composite(checkerboard, rgba_image).convert("RGB")
 
 
-def image_has_transparency(image: PIL.Image.Image) -> bool:
+def image_has_transparency(image: Image) -> bool:
     return image.mode in ("RGBA", "RGBa", "LA") or (
         image.mode == "P" and "transparency" in image.info
     )
 
 
-def deref_palette(image: PIL.Image.Image) -> PIL.Image.Image:
+def deref_palette(image: Image) -> Image:
     if image.mode in ("L", "RGB", "RGBA"):
         return image
 
