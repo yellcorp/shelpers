@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from dataclasses import dataclass
 from enum import IntEnum
@@ -77,11 +78,12 @@ def main():
     is_test = os.getenv("YELLCORP_TEST") == "1"
     if is_test:
         argv0, in_path, out_path = sys.argv
+        terminal_size = shutil.get_terminal_size()
         args = RangerScopeArgs(
             argv0=Path(argv0),
             file_path=Path(in_path),
-            n_cols=80,
-            n_rows=24,
+            n_cols=terminal_size.columns,
+            n_rows=terminal_size.lines,
             image_cache_path=Path(out_path),
             image_preview_enabled=True,
         )
