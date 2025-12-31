@@ -24,6 +24,14 @@ def get_arg_parser():
         """,
     )
 
+    p.add_argument(
+        "--delete",
+        action="store_true",
+        help="""
+            Delete archive files after successful extraction.
+        """,
+    )
+
     return p
 
 
@@ -105,41 +113,54 @@ class Runner:
     def warn(self, message: str):
         print(f"{self.warn_prefix}{message}", file=sys.stderr)
 
-    def extract_all(self, files: Iterable[os.PathLike]):
+    def extract_all(self, files: Iterable[os.PathLike], delete_archives: bool):
         for f in files:
-            self.extract(f)
+            self.extract(f, delete_archives)
 
-    def extract(self, archive_file: os.PathLike):
+    def extract(self, archive_file: os.PathLike, delete_on_success: bool) -> bool:
         archive_path = Path(archive_file)
-        dir = self.dir_for_archive_file(archive_path)
-        if not self.should_extract_to(dir):
-            self.warn(f"Skipping: {str(archive_path)!r}")
-            return
-        dir.mkdir(parents=True, exist_ok=True)
-        self._do_extract(archive_path, dir)
+        out_dir = self.dir_for_archive_file(archive_path)
+        if not self.should_extract_to(out_dir):
+            self.warn(f"Skipping: {os.fspath(archive_path)!r}")
+            return False
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ok = self._do_extract(archive_path, out_dir)
+        if ok and delete_on_success:
+            try:
+                os.remove(archive_path)
+            except FileNotFoundError:
+                pass
+            except Exception as del_exc:
+                self.warn(f"Deleting {os.fspath(archive_path)!r}: {del_exc}")
+        return ok
 
     def dir_for_archive_file(self, file: Path) -> Path:
         return file.parent / f"{file.name}.d"
 
     def should_extract_to(self, dir: Path) -> bool:
         if dir.exists():
-            self.warn(f"Exists: {str(dir)!r}")
+            self.warn(f"Exists: {os.fspath(dir)!r}")
             return False
         return True
 
-    def _do_extract(self, archive: Path, out_dir: Path):
-        print(f"{str(archive)!r} -> {str(out_dir)!r}")
+    def _do_extract(self, archive: Path, out_dir: Path) -> bool:
+        print(f"{os.fspath(archive)!r} -> {os.fspath(out_dir)!r}")
         # TODO: force extract type
-        format = identify_file(archive)
-        extractor = EXTRACTORS.get(format, EXTRACTORS[None])
-        extractor(archive, out_dir)
+        try:
+            arc_type = identify_file(archive)
+            extractor = EXTRACTORS.get(arc_type, EXTRACTORS[None])
+            extractor(archive, out_dir)
+        except Exception as extract_exc:
+            self.warn("{}: {}".format(repr(os.fspath(archive)), extract_exc))
+            return False
+        return True
 
 
 def main():
     argv0 = Path(__file__).name
     args = get_arg_parser().parse_args()
     runner = Runner(argv0)
-    runner.extract_all(args.files)
+    runner.extract_all(args.files, args.delete)
 
 
 if __name__ == "__main__":
